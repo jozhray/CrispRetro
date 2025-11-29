@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Sparkles, TrendingUp } from 'lucide-react';
 import Layout from '../components/Layout';
 import { database } from '../firebase';
 import { ref, set } from 'firebase/database';
@@ -34,7 +34,7 @@ const Home = () => {
 
         const initialData = {
             name: boardName,
-            adminId: userId, // Set creator as admin
+            adminId: userId,
             notes: {},
             timer: {
                 isRunning: false,
@@ -46,10 +46,8 @@ const Home = () => {
             }
         };
 
-        // Save to LocalStorage immediately
         localStorage.setItem(`crisp_board_${newBoardId}`, JSON.stringify(initialData));
 
-        // Save to Firebase if available
         if (database) {
             try {
                 await set(ref(database, `boards/${newBoardId}`), initialData);
@@ -71,70 +69,178 @@ const Home = () => {
 
     return (
         <Layout>
-            <div className="max-w-md mx-auto mt-20 text-center">
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    CrispRetro
-                </h1>
-                <p className="text-gray-600 mb-8">Collaborative Retro Boards for your Team</p>
+            <div className="min-h-screen relative overflow-hidden">
+                {/* Animated Background */}
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+                    <div className="absolute inset-0 opacity-30">
+                        <img
+                            src="/hero-bg.jpg"
+                            alt="background"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-900/50 to-slate-900"></div>
 
-                <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-                    <div className="mb-6 text-left space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="John Doe"
-                                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    {/* Animated Particles */}
+                    <div className="absolute inset-0">
+                        {[...Array(20)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="absolute rounded-full bg-cyan-400/20 blur-xl animate-pulse"
+                                style={{
+                                    width: Math.random() * 100 + 50 + 'px',
+                                    height: Math.random() * 100 + 50 + 'px',
+                                    left: Math.random() * 100 + '%',
+                                    top: Math.random() * 100 + '%',
+                                    animationDelay: Math.random() * 5 + 's',
+                                    animationDuration: Math.random() * 3 + 3 + 's'
+                                }}
                             />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 max-w-4xl mx-auto px-4 pt-20 pb-32">
+                    {/* Hero Section */}
+                    <div className="text-center mb-16">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-400/30 rounded-full text-cyan-300 text-sm mb-6 backdrop-blur-sm">
+                            <Sparkles size={16} className="animate-pulse" />
+                            <span>Next-Gen Retrospective Platform</span>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Board Name</label>
-                            <input
-                                type="text"
-                                value={boardName}
-                                onChange={(e) => setBoardName(e.target.value)}
-                                placeholder="Sprint 42 Retro"
-                                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                            />
+                        <h1 className="text-6xl md:text-7xl font-bold mb-6">
+                            <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(6,182,212,0.3)]">
+                                CrispRetro
+                            </span>
+                        </h1>
+
+                        <p className="text-xl md:text-2xl text-gray-300 mb-4 drop-shadow-lg">
+                            Transform your team retrospectives with
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center gap-4 text-cyan-300">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp size={20} className="text-pink-400" />
+                                <span>Real-time Collaboration</span>
+                            </div>
+                            <span className="text-gray-600">•</span>
+                            <div className="flex items-center gap-2">
+                                <Sparkles size={20} className="text-cyan-400" />
+                                <span>Smart Analytics</span>
+                            </div>
+                            <span className="text-gray-600">•</span>
+                            <div className="flex items-center gap-2">
+                                <Users size={20} className="text-purple-400" />
+                                <span>Team Insights</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <button
-                            onClick={handleCreateBoard}
-                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
-                        >
-                            <Plus size={20} />
-                            Create New Board
-                        </button>
+                    {/* Main Card */}
+                    <div className="max-w-md mx-auto">
+                        <div className="relative group">
+                            {/* Glow Effect */}
+                            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-2xl blur-xl opacity-25 group-hover:opacity-40 transition-opacity duration-500"></div>
 
-                        <div className="relative my-6">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-200"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-white text-gray-500">Or join existing</span>
+                            {/* Glass Card */}
+                            <div className="relative bg-slate-900/80 backdrop-blur-xl p-8 rounded-2xl border border-cyan-500/20 shadow-2xl">
+                                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-purple-500/5 rounded-2xl"></div>
+
+                                <div className="relative space-y-6">
+                                    {/* Name Input */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-cyan-300 mb-2">
+                                            Your Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder="John Doe"
+                                            className="w-full px-4 py-3 bg-slate-800/50 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
+                                        />
+                                    </div>
+
+                                    {/* Board Name Input */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-purple-300 mb-2">
+                                            Board Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={boardName}
+                                            onChange={(e) => setBoardName(e.target.value)}
+                                            placeholder="Sprint 42 Retro"
+                                            className="w-full px-4 py-3 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
+                                        />
+                                    </div>
+
+                                    {/* Create Button */}
+                                    <button
+                                        onClick={handleCreateBoard}
+                                        className="w-full relative group/btn overflow-hidden"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 opacity-100 group-hover/btn:opacity-90 transition-opacity"></div>
+                                        <div className="relative flex items-center justify-center gap-2 py-4 px-6 font-semibold text-white">
+                                            <Plus size={20} />
+                                            <span>Create New Board</span>
+                                        </div>
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover/btn:translate-x-[200%] transition-transform duration-1000"></div>
+                                    </button>
+
+                                    {/* Divider */}
+                                    <div className="relative py-4">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <div className="w-full border-t border-cyan-500/20"></div>
+                                        </div>
+                                        <div className="relative flex justify-center">
+                                            <span className="px-4 bg-slate-900/80 text-sm text-gray-400">
+                                                Or join existing
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Join Form */}
+                                    <form onSubmit={handleJoinBoard} className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={boardId}
+                                            onChange={(e) => setBoardId(e.target.value)}
+                                            placeholder="Enter Board ID"
+                                            className="flex-1 px-4 py-3 bg-slate-800/50 border border-pink-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-pink-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white p-4 rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-pink-500/25"
+                                        >
+                                            <Users size={20} />
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
 
-                        <form onSubmit={handleJoinBoard} className="flex gap-2">
-                            <input
-                                type="text"
-                                value={boardId}
-                                onChange={(e) => setBoardId(e.target.value)}
-                                placeholder="Enter Board ID"
-                                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-                            />
-                            <button
-                                type="submit"
-                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-lg transition-colors"
-                            >
-                                <Users size={20} />
-                            </button>
-                        </form>
+                        {/* Features Grid */}
+                        <div className="grid grid-cols-3 gap-4 mt-8">
+                            {[
+                                { icon: '⏱️', label: 'Timer' },
+                                { icon: '🎵', label: 'Music' },
+                                { icon: '📊', label: 'Export' }
+                            ].map((feature, i) => (
+                                <div
+                                    key={i}
+                                    className="bg-slate-900/50 backdrop-blur-sm border border-cyan-500/10 rounded-xl p-4 text-center hover:border-cyan-500/30 transition-all group cursor-default"
+                                >
+                                    <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">
+                                        {feature.icon}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        {feature.label}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
