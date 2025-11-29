@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Users, Sparkles, TrendingUp } from 'lucide-react';
 import Layout from '../components/Layout';
 import { database } from '../firebase';
-import { ref, set } from 'firebase/database';
+import { ref, set, get } from 'firebase/database';
 
 const Home = () => {
     const [name, setName] = useState(localStorage.getItem('crisp_user_name') || '');
@@ -23,6 +23,46 @@ const Home = () => {
             setBoardId(joinId);
         }
     }, [searchParams]);
+
+    // Check if username already exists in the board
+    const checkDuplicateUsername = async (boardId, username) => {
+        const userId = localStorage.getItem('crisp_user_id');
+
+        // Try Firebase first
+        if (database) {
+            try {
+                const boardRef = ref(database, `boards/${boardId}`);
+                const snapshot = await get(boardRef);
+
+                if (snapshot.exists()) {
+                    const boardData = snapshot.val();
+                    const notes = boardData.notes || {};
+
+                    // Check if any note has the same author name but different userId
+                    const existingAuthors = Object.values(notes)
+                        .filter(note => note.author === username.trim() && note.authorId !== userId);
+
+                    return existingAuthors.length > 0;
+                }
+            } catch (error) {
+                console.error("Error checking username in Firebase:", error);
+            }
+        }
+
+        // Fallback to LocalStorage
+        const localData = localStorage.getItem(`crisp_board_${boardId}`);
+        if (localData) {
+            const boardData = JSON.parse(localData);
+            const notes = boardData.notes || {};
+
+            const existingAuthors = Object.values(notes)
+                .filter(note => note.author === username.trim() && note.authorId !== userId);
+
+            return existingAuthors.length > 0;
+        }
+
+        return false;
+    };
 
     const handleCreateBoard = async () => {
         if (!name.trim()) return alert('Please enter your name first');
@@ -59,10 +99,17 @@ const Home = () => {
         navigate(`/board/${newBoardId}`);
     };
 
-    const handleJoinBoard = (e) => {
+    const handleJoinBoard = async (e) => {
         e.preventDefault();
         if (!name.trim()) return alert('Please enter your name first');
         if (!boardId.trim()) return;
+
+        // Check for duplicate username
+        const isDuplicate = await checkDuplicateUsername(boardId, name);
+        if (isDuplicate) {
+            return alert(`The name "${name}" is already taken in this board.\n\nPlease use:\n• Your full name (e.g., "${name} Smith")\n• An alternate name (e.g., "${name}2" or "${name}_dev")\n\nThis helps avoid confusion in the retro session.`);
+        }
+
         localStorage.setItem('crisp_user_name', name);
         navigate(`/board/${boardId}`);
     };
