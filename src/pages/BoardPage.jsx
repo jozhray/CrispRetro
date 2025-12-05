@@ -637,16 +637,12 @@ const BoardPage = () => {
                     {/* Board Grid - Columns */}
                     <div
                         ref={boardRef}
-                        className={`flex-1 flex gap-6 overflow-x-auto pb-4 ${sortedColumns.length <= 4 ? '' : ''}`}
+                        className="flex-1 flex gap-4 md:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
                     >
                         {sortedColumns.map(column => (
                             <div
                                 key={column.id}
-                                className={
-                                    isAdmin
-                                        ? (sortedColumns.length <= 3 ? 'flex-1 min-w-[250px]' : 'flex-shrink-0 w-72')
-                                        : (sortedColumns.length <= 4 ? 'flex-1 min-w-[250px]' : 'flex-shrink-0 w-80')
-                                }
+                                className="snap-center shrink-0 w-[85vw] sm:w-[50vw] md:w-[45vw] lg:flex-1 lg:min-w-[300px] xl:max-w-md transition-all duration-300"
                             >
                                 <Column
                                     column={column}

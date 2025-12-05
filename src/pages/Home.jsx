@@ -41,9 +41,9 @@ const Home = () => {
                     const boardData = snapshot.val();
                     const notes = boardData.notes || {};
 
-                    // Check if any note has the same author name but different userId
+                    // Check if any note has the same author name but different userId (case-insensitive)
                     const existingAuthors = Object.values(notes)
-                        .filter(note => note.author === username.trim() && note.authorId !== userId);
+                        .filter(note => note.author && note.author.toLowerCase() === username.trim().toLowerCase() && note.authorId !== userId);
 
                     return existingAuthors.length > 0;
                 }
@@ -59,7 +59,7 @@ const Home = () => {
             const notes = boardData.notes || {};
 
             const existingAuthors = Object.values(notes)
-                .filter(note => note.author === username.trim() && note.authorId !== userId);
+                .filter(note => note.author && note.author.toLowerCase() === username.trim().toLowerCase() && note.authorId !== userId);
 
             return existingAuthors.length > 0;
         }
@@ -284,16 +284,16 @@ const Home = () => {
                                             placeholder={boardName ? "Not needed for new board" : "Enter Board ID"}
                                             disabled={!!boardName}
                                             className={`flex-1 px-4 py-3 bg-slate-800/50 border rounded-lg text-white placeholder-gray-500 outline-none transition-all backdrop-blur-sm ${boardName
-                                                    ? 'border-gray-600 cursor-not-allowed opacity-50'
-                                                    : 'border-pink-500/30 focus:ring-2 focus:ring-pink-400 focus:border-transparent'
+                                                ? 'border-gray-600 cursor-not-allowed opacity-50'
+                                                : 'border-pink-500/30 focus:ring-2 focus:ring-pink-400 focus:border-transparent'
                                                 }`}
                                         />
                                         <button
                                             type="submit"
                                             disabled={!!boardName}
                                             className={`text-white p-4 rounded-lg transition-all transform shadow-lg ${boardName
-                                                    ? 'bg-gray-600 cursor-not-allowed opacity-50'
-                                                    : 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:scale-105 active:scale-95 shadow-pink-500/25'
+                                                ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                                                : 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:scale-105 active:scale-95 shadow-pink-500/25'
                                                 }`}
                                         >
                                             <Users size={20} />
