@@ -312,7 +312,7 @@ export const useBoard = (boardId) => {
     const getNotesByColumn = useCallback((columnId) => {
         return Object.values(notes)
             .filter(note => note.columnId === columnId)
-            .sort((a, b) => b.votes - a.votes || b.createdAt - a.createdAt);
+            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     }, [notes]);
 
     // Timer Controls

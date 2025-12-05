@@ -80,23 +80,45 @@ const BoardPage = () => {
 
     const prepareExportData = () => {
         const exportData = [];
+
+        // Check if data is available
+        if (!columns || Object.keys(columns).length === 0) {
+            console.log('Export: No columns found');
+            return exportData;
+        }
+        if (!notes || Object.keys(notes).length === 0) {
+            console.log('Export: No notes found');
+            return exportData;
+        }
+
         Object.values(columns).forEach(column => {
-            const columnNotes = getNotesByColumn(column.id);
+            // Get notes for this column directly from notes object
+            const columnNotes = Object.values(notes)
+                .filter(note => note.columnId === column.id)
+                .sort((a, b) => (b.votes || 0) - (a.votes || 0));
+
             columnNotes.forEach(note => {
                 exportData.push({
                     'Column': column.title,
-                    'Note Content': note.content,
-                    'Author': note.author,
+                    'Note Content': note.content || '',
+                    'Author': note.author || 'Anonymous',
                     'Votes': note.votes || 0,
-                    'Created At': new Date(note.createdAt).toLocaleString()
+                    'Created At': note.createdAt ? new Date(note.createdAt).toLocaleString() : 'N/A'
                 });
             });
         });
+
+        console.log('Export: Prepared', exportData.length, 'notes');
         return exportData;
     };
 
     const handleExportExcel = () => {
         try {
+            if (!isFirebaseReady) {
+                toast.warning('Please wait, data is still loading...');
+                return;
+            }
+
             const exportData = prepareExportData();
             if (exportData.length === 0) {
                 toast.warning('No notes to export!');
@@ -111,8 +133,10 @@ const BoardPage = () => {
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Retro Board");
-            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-            XLSX.writeFile(wb, `${boardName.replace(/\s+/g, '-')}_${timestamp}.xlsx`);
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            XLSX.writeFile(wb, `${safeName}_${timestamp}.xlsx`);
             setShowExportMenu(false);
             toast.success('Exported to Excel!');
         } catch (err) {
@@ -123,6 +147,11 @@ const BoardPage = () => {
 
     const handleExportCSV = () => {
         try {
+            if (!isFirebaseReady) {
+                toast.warning('Please wait, data is still loading...');
+                return;
+            }
+
             const exportData = prepareExportData();
             if (exportData.length === 0) {
                 toast.warning('No notes to export!');
@@ -148,8 +177,10 @@ const BoardPage = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-            a.download = `${boardName.replace(/\s+/g, '-')}_${timestamp}.csv`;
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            a.download = `${safeName}_${timestamp}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
             setShowExportMenu(false);
@@ -162,6 +193,11 @@ const BoardPage = () => {
 
     const handleExportPDF = () => {
         try {
+            if (!isFirebaseReady) {
+                toast.warning('Please wait, data is still loading...');
+                return;
+            }
+
             const exportData = prepareExportData();
             if (exportData.length === 0) {
                 toast.warning('No notes to export!');
@@ -207,8 +243,10 @@ const BoardPage = () => {
                 }
             });
 
-            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-            doc.save(`${boardName.replace(/\s+/g, '-')}_${timestamp}.pdf`);
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            doc.save(`${safeName}_${timestamp}.pdf`);
             setShowExportMenu(false);
             toast.success('Exported to PDF!');
         } catch (err) {
@@ -219,6 +257,11 @@ const BoardPage = () => {
 
     const handleExportJSON = () => {
         try {
+            if (!isFirebaseReady) {
+                toast.warning('Please wait, data is still loading...');
+                return;
+            }
+
             const exportData = {
                 boardName,
                 boardId,
@@ -227,7 +270,7 @@ const BoardPage = () => {
                     id: column.id,
                     title: column.title,
                     color: column.color,
-                    notes: getNotesByColumn(column.id)
+                    notes: Object.values(notes).filter(n => n.columnId === column.id)
                 }))
             };
 
@@ -236,8 +279,10 @@ const BoardPage = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-            a.download = `${boardName.replace(/\s+/g, '-')}_${timestamp}.json`;
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            a.download = `${safeName}_${timestamp}.json`;
             a.click();
             window.URL.revokeObjectURL(url);
             setShowExportMenu(false);
