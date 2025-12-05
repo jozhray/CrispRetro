@@ -19,11 +19,13 @@ const BoardPage = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showUserList, setShowUserList] = useState(false);
     const [showAddColumnModal, setShowAddColumnModal] = useState(false);
     const [newColumnTitle, setNewColumnTitle] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLUMN_COLORS[4]); // Default blue
     const boardRef = useRef(null);
     const exportMenuRef = useRef(null);
+    const userListRef = useRef(null);
     const currentUser = localStorage.getItem('crisp_user_name') || 'Anonymous';
     const toast = useToast();
 
@@ -82,13 +84,23 @@ const BoardPage = () => {
             }
         };
 
+        const handleClickOutsideUserList = (event) => {
+            if (userListRef.current && !userListRef.current.contains(event.target)) {
+                setShowUserList(false);
+            }
+        };
+
         if (showExportMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
+        if (showUserList) {
+            document.addEventListener('mousedown', handleClickOutsideUserList);
+        }
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('mousedown', handleClickOutsideUserList);
         };
-    }, [showExportMenu]);
+    }, [showExportMenu, showUserList]);
 
     const handleAddColumn = () => {
         if (!newColumnTitle.trim()) return;
@@ -155,7 +167,8 @@ const BoardPage = () => {
             XLSX.utils.book_append_sheet(wb, ws, "Retro Board");
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            const nameToUse = boardName || 'Retro-Board';
+            const safeName = nameToUse.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             XLSX.writeFile(wb, `${safeName}_${timestamp}.xlsx`);
             setShowExportMenu(false);
             toast.success('Exported to Excel!');
@@ -199,7 +212,8 @@ const BoardPage = () => {
             a.href = url;
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            const nameToUse = boardName || 'Retro-Board';
+            const safeName = nameToUse.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             a.download = `${safeName}_${timestamp}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
@@ -286,7 +300,8 @@ const BoardPage = () => {
 
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            const nameToUse = boardName || 'Retro-Board';
+            const safeName = nameToUse.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             doc.save(`${safeName}_${timestamp}.pdf`);
 
             setShowExportMenu(false);
@@ -324,7 +339,8 @@ const BoardPage = () => {
             a.href = url;
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
-            const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
+            const nameToUse = boardName || 'Retro-Board';
+            const safeName = nameToUse.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             a.download = `${safeName}_${timestamp}.json`;
             a.click();
             window.URL.revokeObjectURL(url);
@@ -429,7 +445,7 @@ const BoardPage = () => {
                 {/* Header */}
                 <div className="flex flex-col gap-4 mb-6">
                     {/* Top Row: Title & Main Info */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                             <button
                                 onClick={() => navigate('/')}
@@ -447,49 +463,96 @@ const BoardPage = () => {
                                     className={`text-2xl font-bold text-gray-800 bg-transparent border border-transparent rounded px-1 -ml-1 outline-none truncate transition-all ${isAdmin ? 'hover:border-gray-200 focus:border-blue-300' : 'cursor-default'}`}
                                 />
 
-                                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${isFirebaseReady ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                                    {isFirebaseReady ? <Wifi size={10} /> : <WifiOff size={10} />}
-                                    <span className="hidden sm:inline">{isFirebaseReady ? 'Live' : 'Local'}</span>
-                                </div>
                             </div>
 
-                            {/* Online Users - Compact Stack with Count */}
-                            {onlineUsers.length > 0 && (
-                                <div className="flex items-center gap-2 flex-shrink-0 mx-2">
-                                    <div className="flex items-center -space-x-1.5 ">
+                        </div>
+
+
+                        {/* Live/Local Indicator - Centered */}
+                        <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 flex justify-center mt-2 md:mt-0 z-20 pointer-events-none">
+                            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium shadow-sm border backdrop-blur-sm ${isFirebaseReady ? 'bg-green-100/80 text-green-700 border-green-200/50' : 'bg-orange-100/80 text-orange-700 border-orange-200/50'}`}>
+                                {isFirebaseReady ? <Wifi size={12} className="animate-pulse" /> : <WifiOff size={12} />}
+                                <span>{isFirebaseReady ? 'Live' : 'Local Mode'}</span>
+                            </div>
+                        </div>
+
+                        {/* Online Users - Right Side */}
+                        {onlineUsers.length > 0 && (
+                            <div className="relative flex items-center gap-2 flex-shrink-0 justify-end z-[60]" ref={userListRef}>
+                                <button
+                                    onClick={() => setShowUserList(!showUserList)}
+                                    className="flex items-center gap-2 p-1 hover:bg-white/40 rounded-full transition-colors outline-none focus:ring-2 focus:ring-blue-300 group"
+                                    title="Show all online users"
+                                >
+                                    <span className="text-xs font-medium text-gray-500 hidden lg:inline mr-1 group-hover:text-gray-700">
+                                        {onlineUsers.length} online
+                                    </span>
+                                    <div className="flex items-center -space-x-2 group-hover:space-x-0.5 transition-all">
                                         {onlineUsers.slice(0, 4).map((user, index) => (
                                             <div
                                                 key={user.id}
-                                                className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-sm ring-2 ring-transparent hover:scale-110 hover:z-10 transition-transform cursor-help"
-                                                title={user.name}
-                                                style={{ zIndex: 5 - index }}
+                                                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-sm ring-2 ring-transparent transition-all cursor-pointer relative"
+                                                style={{ zIndex: 30 - index }}
                                             >
                                                 {user.name.charAt(0).toUpperCase()}
                                             </div>
                                         ))}
                                         {onlineUsers.length > 4 && (
-                                            <div className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-500 text-[10px] font-bold shadow-sm z-0">
+                                            <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-500 text-xs font-bold shadow-sm z-30">
                                                 +{onlineUsers.length - 4}
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-xs font-medium text-gray-500 hidden md:inline">
-                                        {onlineUsers.length} online
-                                    </span>
-                                </div>
-                            )}
-                        </div>
+                                </button>
 
+                                {/* User List Dropdown */}
+                                {showUserList && (
+                                    <div className="absolute top-full right-0 mt-2 w-64 bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+                                        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                                            <h3 className="text-sm font-semibold text-gray-700">Online Members</h3>
+                                            <p className="text-xs text-gray-500">{onlineUsers.length} active now</p>
+                                        </div>
+                                        <div className="overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-200">
+                                            {onlineUsers.map(user => (
+                                                <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-blue-50/50 rounded-lg transition-colors">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                                        {user.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium text-gray-800 truncate">{user.name}</div>
+                                                        {user.id === localStorage.getItem('crisp_user_id') && (
+                                                            <div className="text-[10px] text-blue-500 font-medium">You</div>
+                                                        )}
+                                                    </div>
+                                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm animate-pulse"></div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Unified Toolbar - Visible to ALL Users */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/60 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/60 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm relative z-50">
                         {/* Session Controls Group (Timer, Music, Poll) */}
-                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
+                        <div className="flex flex-nowrap items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
                             <div className="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200/50">
                                 <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
                                 <div className="w-px h-6 bg-gray-300 mx-1"></div>
                                 <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
+                                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                                <Poll
+                                    polls={polls}
+                                    activePoll={activePoll}
+                                    isAdmin={isAdmin}
+                                    onCreatePoll={createPoll}
+                                    onVotePoll={votePoll}
+                                    onClosePoll={closePoll}
+                                    onDeletePoll={deletePoll}
+                                    currentUserId={localStorage.getItem('crisp_user_id')}
+                                />
                             </div>
 
                         </div>
@@ -510,22 +573,13 @@ const BoardPage = () => {
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={handleShare}
-                                    className="flex items-center gap-2 h-[46px] bg-white hover:bg-gray-50 text-gray-700 px-3 rounded-xl border border-gray-200 transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
+                                    className="flex items-center gap-2 h-[46px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 rounded-xl border border-transparent transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
                                 >
                                     <Share2 size={16} />
                                     <span className="hidden sm:inline">Invite</span>
                                 </button>
 
-                                <Poll
-                                    polls={polls}
-                                    activePoll={activePoll}
-                                    isAdmin={isAdmin}
-                                    onCreatePoll={createPoll}
-                                    onVotePoll={votePoll}
-                                    onClosePoll={closePoll}
-                                    onDeletePoll={deletePoll}
-                                    currentUserId={localStorage.getItem('crisp_user_id')}
-                                />
+
 
                                 {/* Export - Admin Only */}
                                 {isAdmin && (
@@ -539,7 +593,7 @@ const BoardPage = () => {
                                             <ChevronDown size={14} />
                                         </button>
                                         {showExportMenu && (
-                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                                 <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Export As</div>
                                                 <button onClick={handleExportExcel} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
                                                     <span>📊</span> Excel
@@ -564,7 +618,6 @@ const BoardPage = () => {
                                         onClick={() => {
                                             if (window.confirm("Are you sure you want to clear all notes from the board? This action cannot be undone.")) {
                                                 clearAllNotes();
-                                                toast.success("Board cleared successfully");
                                             }
                                         }}
                                         className="flex items-center gap-2 h-[46px] bg-red-50 hover:bg-red-100 text-red-600 px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap border border-red-100"

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Play, Pause, RotateCcw, Clock, X, Volume2 } from 'lucide-react';
 
 // Timer presets in seconds (30-second increments)
@@ -200,7 +201,7 @@ const Timer = ({ timer, isAdmin, onUpdateTimer, music, onUpdateMusic }) => {
                 {/* Time display - clickable for admin */}
                 <button
                     onClick={() => isAdmin && !timer.isRunning && setShowPicker(true)}
-                    className={`font-mono font-bold text-2xl min-w-[80px] text-center ${displayTime < 60 && timer.isRunning
+                    className={`font-mono font-bold text-2xl min-w-[60px] text-center ${displayTime < 60 && timer.isRunning
                         ? 'text-red-400 animate-pulse'
                         : 'text-white'
                         } ${isAdmin && !timer.isRunning ? 'hover:text-blue-400 cursor-pointer' : ''}`}
@@ -214,7 +215,7 @@ const Timer = ({ timer, isAdmin, onUpdateTimer, music, onUpdateMusic }) => {
                     <div className="flex items-center gap-1">
                         <button
                             onClick={handleStartPause}
-                            className={`p-2 rounded-lg transition-all ${timer.isRunning
+                            className={`p-1.5 rounded-lg transition-all ${timer.isRunning
                                 ? 'bg-orange-500 hover:bg-orange-600 text-white'
                                 : 'bg-green-500 hover:bg-green-600 text-white'
                                 }`}
@@ -224,7 +225,7 @@ const Timer = ({ timer, isAdmin, onUpdateTimer, music, onUpdateMusic }) => {
                         </button>
                         <button
                             onClick={handleReset}
-                            className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-all"
+                            className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-all"
                             title="Reset"
                         >
                             <RotateCcw size={16} />
@@ -236,7 +237,7 @@ const Timer = ({ timer, isAdmin, onUpdateTimer, music, onUpdateMusic }) => {
                 <div className="relative" ref={volumeRef}>
                     <button
                         onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-                        className={`p-2 rounded-lg transition-all ${volume === 0 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}
+                        className={`p-1.5 rounded-lg transition-all ${volume === 0 ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}
                         title="Timer Volume"
                     >
                         <Volume2 size={16} />
@@ -270,8 +271,8 @@ const Timer = ({ timer, isAdmin, onUpdateTimer, music, onUpdateMusic }) => {
             </div>
 
             {/* iOS-style Scroll Picker Modal */}
-            {showPicker && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center z-50" onClick={() => setShowPicker(false)}>
+            {showPicker && createPortal(
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center z-[100]" onClick={() => setShowPicker(false)}>
                     <div
                         className="bg-slate-900 w-full max-w-sm rounded-t-3xl p-6 pb-10 animate-slide-up"
                         onClick={e => e.stopPropagation()}
@@ -326,7 +327,8 @@ const Timer = ({ timer, isAdmin, onUpdateTimer, music, onUpdateMusic }) => {
                             Set {formatTime(selectedSeconds)}
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             <style>{`

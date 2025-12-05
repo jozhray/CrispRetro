@@ -281,12 +281,20 @@ const Home = () => {
                                             type="text"
                                             value={boardId}
                                             onChange={(e) => setBoardId(e.target.value)}
-                                            placeholder="Enter Board ID"
-                                            className="flex-1 px-4 py-3 bg-slate-800/50 border border-pink-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-pink-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
+                                            placeholder={boardName ? "Not needed for new board" : "Enter Board ID"}
+                                            disabled={!!boardName}
+                                            className={`flex-1 px-4 py-3 bg-slate-800/50 border rounded-lg text-white placeholder-gray-500 outline-none transition-all backdrop-blur-sm ${boardName
+                                                    ? 'border-gray-600 cursor-not-allowed opacity-50'
+                                                    : 'border-pink-500/30 focus:ring-2 focus:ring-pink-400 focus:border-transparent'
+                                                }`}
                                         />
                                         <button
                                             type="submit"
-                                            className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white p-4 rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-pink-500/25"
+                                            disabled={!!boardName}
+                                            className={`text-white p-4 rounded-lg transition-all transform shadow-lg ${boardName
+                                                    ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                                                    : 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:scale-105 active:scale-95 shadow-pink-500/25'
+                                                }`}
                                         >
                                             <Users size={20} />
                                         </button>

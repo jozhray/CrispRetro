@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '../firebase';
 import { ref, onValue, set, update, remove } from 'firebase/database';
+import { useToast } from '../components/Toast';
 
 // Default columns for new boards
 const DEFAULT_COLUMNS = {
@@ -30,6 +31,9 @@ export const useBoard = (boardId) => {
     const [polls, setPolls] = useState({});
     const [onlineUsers, setOnlineUsers] = useState([]);
     const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+
+    // Toast for notifications
+    const toast = useToast();
 
     const currentUser = localStorage.getItem('crisp_user_name');
     const currentUserId = localStorage.getItem('crisp_user_id');
@@ -133,14 +137,15 @@ export const useBoard = (boardId) => {
 
     // Save data helper
     const saveData = useCallback((updates) => {
-        if (!boardId) return;
+        if (!boardId) return Promise.resolve();
 
         if (database) {
-            update(ref(database, `boards/${boardId}`), updates);
+            return update(ref(database, `boards/${boardId}`), updates);
         } else {
             const currentData = JSON.parse(localStorage.getItem(`crisp_board_${boardId}`) || '{}');
             const newData = { ...currentData, ...updates };
             localStorage.setItem(`crisp_board_${boardId}`, JSON.stringify(newData));
+            return Promise.resolve();
         }
     }, [boardId]);
 
@@ -276,7 +281,6 @@ export const useBoard = (boardId) => {
                     votedBy: updatedVotedBy
                 }).catch(err => {
                     console.error("Failed to update vote:", err);
-                    // Optionally revert here, but usually retry or sync handles it
                 });
             } else {
                 // Fallback for LocalStorage
@@ -334,8 +338,6 @@ export const useBoard = (boardId) => {
                 // Then add reaction to the new emoji
                 reactions[emoji] = [...emojiReactions, userId];
             }
-
-            console.log('Saving reactions:', reactions);
 
             const updatedNote = { ...note, reactions };
             const updatedNotes = { ...prev, [noteId]: updatedNote };
@@ -441,9 +443,30 @@ export const useBoard = (boardId) => {
 
     // Clear all notes (Admin only)
     const clearAllNotes = useCallback(() => {
+        // Optimistic local update
         setNotes({});
-        saveData({ notes: null }); // Passing null removes the node in Firebase
-    }, [saveData]);
+
+        if (database && boardId) {
+            console.log("Removing notes from Firebase...");
+            const notesRef = ref(database, `boards/${boardId}/notes`);
+            remove(notesRef)
+                .then(() => {
+                    console.log("Successfully cleared notes from Firebase.");
+                    toast.success("Board cleared successfully");
+                })
+                .catch((error) => {
+                    console.error("Failed to clear notes:", error);
+                    toast.error("Failed to clear notes. Please try again.");
+                    // Reload to restore state if write failed
+                    window.location.reload();
+                });
+        } else {
+            // Fallback for LocalStorage
+            console.log("Clearing notes from LocalStorage...");
+            saveData({ notes: {} });
+            toast.success("Board cleared (Local)");
+        }
+    }, [boardId, saveData, toast]);
 
     // Get sorted columns
     const sortedColumns = Object.values(columns).sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -483,4 +506,3 @@ export const useBoard = (boardId) => {
         clearAllNotes
     };
 };
-
