@@ -1,11 +1,16 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ThumbsUp, Trash2, User, GripVertical } from 'lucide-react';
+import { ThumbsUp, Trash2, User, GripVertical, MessageSquare, Send, Edit2, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId, isAdmin }) => {
+const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, isAdmin }) => {
+    const cardRef = useRef(null);
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
     const [lastVoteCount, setLastVoteCount] = useState(note.votes || 0);
+    const [showComments, setShowComments] = useState(false);
+    const [newComment, setNewComment] = useState("");
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editContent, setEditContent] = useState("");
     const canDelete = isAdmin || (note.authorId && note.authorId === currentUserId);
 
     // Check if current user has voted
@@ -17,6 +22,20 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
     }, [note.content]);
+
+    // Handle click outside to close comments
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (cardRef.current && !cardRef.current.contains(event.target) && showComments) {
+                setShowComments(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showComments]);
 
     // Detect when votes increase (only show animation when votes go up)
     useEffect(() => {
@@ -56,8 +75,51 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId
         e.target.style.opacity = '1';
     };
 
+    const submitComment = () => {
+        // Optimistically clear input immediately to prevent UI lag
+        const contentToSubmit = newComment.trim();
+        if (contentToSubmit) {
+            setNewComment(""); // Clear first
+            onAddComment(note.id, contentToSubmit);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submitComment();
+        }
+    };
+
+    const startEditing = (comment) => {
+        setEditingCommentId(comment.id);
+        setEditContent(comment.content);
+    };
+
+    const cancelEditing = () => {
+        setEditingCommentId(null);
+        setEditContent("");
+    };
+
+    const saveEdit = (commentId) => {
+        if (editContent.trim()) {
+            onUpdateComment(note.id, commentId, editContent.trim());
+            setEditingCommentId(null);
+        }
+    };
+
+    const handleEditKeyDown = (e, commentId) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            saveEdit(commentId);
+        } else if (e.key === 'Escape') {
+            cancelEditing();
+        }
+    };
+
     return (
         <motion.div
+            ref={cardRef}
             layout
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -130,6 +192,22 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Comment Toggle */}
+                    <button
+                        onClick={() => hasContent && setShowComments(!showComments)}
+                        disabled={!hasContent}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${!hasContent
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                            : (note.comments && Object.keys(note.comments).length > 0)
+                                ? 'bg-purple-50 text-purple-600'
+                                : 'hover:bg-gray-100 text-gray-400'
+                            }`}
+                        title={!hasContent ? "Add content to comment" : "Comments"}
+                    >
+                        <MessageSquare size={14} />
+                        <span>{note.comments ? Object.keys(note.comments).length : 0}</span>
+                    </button>
+
                     <motion.button
                         onClick={handleVote}
                         whileTap={hasContent ? { scale: 0.9 } : {}}
@@ -164,6 +242,93 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId
                     )}
                 </div>
             </div>
+
+            {/* Comments Section */}
+            <AnimatePresence>
+                {showComments && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="mt-3 pt-3 border-t border-gray-50 space-y-3">
+                            {/* Comment List */}
+                            {note.comments && Object.values(note.comments).sort((a, b) => a.createdAt - b.createdAt).map(comment => (
+                                <div key={comment.id} className="bg-gray-50/50 p-2.5 rounded-lg text-xs group/comment relative border border-gray-100">
+                                    <div className="flex justify-between items-start mb-1 h-5">
+                                        <span className="font-semibold text-gray-700">{comment.author}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-gray-400">
+                                                {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {comment.updatedAt && ' (edited)'}
+                                            </span>
+
+                                            {(isAdmin || comment.authorId === currentUserId) && !editingCommentId && (
+                                                <div className="flex items-center gap-1 opacity-0 group-hover/comment:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => startEditing(comment)}
+                                                        className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded"
+                                                        title="Edit"
+                                                    >
+                                                        <Edit2 size={12} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDeleteComment(note.id, comment.id)}
+                                                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {editingCommentId === comment.id ? (
+                                        <div className="flex gap-2 items-center mt-1">
+                                            <input
+                                                type="text"
+                                                value={editContent}
+                                                onChange={(e) => setEditContent(e.target.value)}
+                                                onKeyDown={(e) => handleEditKeyDown(e, comment.id)}
+                                                className="flex-1 bg-white border border-blue-300 rounded px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-100/50"
+                                                autoFocus
+                                            />
+                                            <div className="flex items-center bg-white border border-gray-200 rounded-md overflow-hidden">
+                                                <button onClick={() => saveEdit(comment.id)} className="p-1.5 text-green-600 hover:bg-green-50 transition-colors"><Check size={14} /></button>
+                                                <div className="w-px h-full bg-gray-200"></div>
+                                                <button onClick={cancelEditing} className="p-1.5 text-red-500 hover:bg-red-50 transition-colors"><X size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-600 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
+                                    )}
+                                </div>
+                            ))}
+
+                            {/* Add Comment Input */}
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Add a comment..."
+                                    className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none transition-all"
+                                />
+                                <button
+                                    onClick={submitComment}
+                                    disabled={!newComment.trim()}
+                                    className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <Send size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 };

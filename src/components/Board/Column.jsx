@@ -13,12 +13,16 @@ const Column = ({
     onVoteNote,
     onReactNote,
     onMoveNote,
+    onAddComment,
+    onUpdateComment,
+    onDeleteComment,
     onUpdateColumn,
     onDeleteColumn,
     currentUser,
     currentUserId,
     isAdmin,
-    searchQuery
+    searchQuery,
+    hideTitleOnMobile = false
 }) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -77,7 +81,7 @@ const Column = ({
 
     return (
         <div
-            className={`flex flex-col h-full rounded-2xl ${column.color} p-4 min-h-[500px] transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-400 ring-offset-2 scale-[1.02]' : ''
+            className={`flex flex-col h-full rounded-2xl ${column.color} p-2 md:p-4 transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-400 ring-offset-2 scale-[1.02]' : ''
                 }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -112,7 +116,7 @@ const Column = ({
                     </div>
                 ) : (
                     <>
-                        <h2 className={`font-bold text-lg ${column.titleColor}`}>{column.title}</h2>
+                        <h2 className={`font-bold text-lg ${column.titleColor} ${hideTitleOnMobile ? 'hidden md:block' : ''}`}>{column.title}</h2>
                         <div className="flex items-center gap-2">
                             <span className="bg-white/50 px-2 py-1 rounded-full text-xs font-medium text-gray-600">
                                 {filteredNotes.length}
@@ -176,7 +180,7 @@ const Column = ({
                     <button
                         onClick={() => !hasMyEmptyNote && onAddNote(column.id)}
                         disabled={hasMyEmptyNote}
-                        className={`w-full py-2.5 mb-4 rounded-xl border transition-all flex items-center justify-center gap-2 font-medium text-sm shadow-sm ${hasMyEmptyNote
+                        className={`w-full py-2.5 mb-2 md:mb-4 rounded-xl border transition-all flex items-center justify-center gap-2 font-medium text-sm shadow-sm ${hasMyEmptyNote
                             ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                             : 'bg-white/60 hover:bg-white text-gray-600 hover:text-blue-600 border-transparent hover:border-blue-100'
                             }`}
@@ -202,8 +206,12 @@ const Column = ({
                             note={note}
                             onUpdate={onUpdateNote}
                             onDelete={onDeleteNote}
+                            onDelete={onDeleteNote}
                             onVote={onVoteNote}
                             onReact={onReactNote}
+                            onAddComment={onAddComment}
+                            onUpdateComment={onUpdateComment}
+                            onDeleteComment={onDeleteComment}
                             currentUser={currentUser}
                             currentUserId={currentUserId}
                             isAdmin={isAdmin}

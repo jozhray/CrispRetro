@@ -349,6 +349,70 @@ export const useBoard = (boardId) => {
         });
     }, [saveData]);
 
+    const addComment = useCallback((noteId, content) => {
+        const userId = localStorage.getItem('crisp_user_id');
+        const userName = localStorage.getItem('crisp_user_name');
+
+        if (!content.trim()) return;
+
+        const commentId = crypto.randomUUID();
+        const newComment = {
+            id: commentId,
+            content,
+            author: userName,
+            authorId: userId,
+            createdAt: Date.now()
+        };
+
+        setNotes(prev => {
+            const note = prev[noteId];
+            if (!note) return prev;
+
+            const updatedComments = { ...(note.comments || {}), [commentId]: newComment };
+            const updatedNote = { ...note, comments: updatedComments };
+            const updatedNotes = { ...prev, [noteId]: updatedNote };
+
+            saveData({ notes: updatedNotes });
+            return updatedNotes;
+        });
+    }, [saveData]);
+
+    const updateComment = useCallback((noteId, commentId, newContent) => {
+        setNotes(prev => {
+            const note = prev[noteId];
+            if (!note || !note.comments || !note.comments[commentId]) return prev;
+
+            const updatedComment = {
+                ...note.comments[commentId],
+                content: newContent,
+                updatedAt: Date.now()
+            };
+
+            const updatedComments = { ...note.comments, [commentId]: updatedComment };
+            const updatedNote = { ...note, comments: updatedComments };
+            const updatedNotes = { ...prev, [noteId]: updatedNote };
+
+            saveData({ notes: updatedNotes });
+            return updatedNotes;
+        });
+    }, [saveData]);
+
+    const deleteComment = useCallback((noteId, commentId) => {
+        setNotes(prev => {
+            const note = prev[noteId];
+            if (!note || !note.comments) return prev;
+
+            const updatedComments = { ...note.comments };
+            delete updatedComments[commentId];
+
+            const updatedNote = { ...note, comments: updatedComments };
+            const updatedNotes = { ...prev, [noteId]: updatedNote };
+
+            saveData({ notes: updatedNotes });
+            return updatedNotes;
+        });
+    }, [saveData]);
+
     const moveNote = useCallback((noteId, newColumnId) => {
         setNotes(prev => {
             if (!prev[noteId]) return prev;
@@ -494,6 +558,9 @@ export const useBoard = (boardId) => {
         deleteNote,
         voteNote,
         reactNote,
+        addComment,
+        updateComment,
+        deleteComment,
         moveNote,
         getNotesByColumn,
         updateBoardName,

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2 } from 'lucide-react';
+import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -21,6 +21,7 @@ const BoardPage = () => {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showUserList, setShowUserList] = useState(false);
     const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [newColumnTitle, setNewColumnTitle] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLUMN_COLORS[4]); // Default blue
     const boardRef = useRef(null);
@@ -49,6 +50,9 @@ const BoardPage = () => {
         deleteNote,
         voteNote,
         reactNote,
+        addComment,
+        updateComment,
+        deleteComment,
         moveNote,
         getNotesByColumn,
         updateBoardName,
@@ -60,6 +64,16 @@ const BoardPage = () => {
         deletePoll,
         clearAllNotes
     } = useBoard(boardId);
+
+    // Mobile Column Selection State
+    const [selectedMobileColumnId, setSelectedMobileColumnId] = useState(null);
+
+    // Initialize selected mobile column once columns are loaded
+    useEffect(() => {
+        if (!selectedMobileColumnId && sortedColumns.length > 0) {
+            setSelectedMobileColumnId(sortedColumns[0].id);
+        }
+    }, [sortedColumns, selectedMobileColumnId]);
 
     // Redirect if no user name found
     React.useEffect(() => {
@@ -135,7 +149,8 @@ const BoardPage = () => {
                     'Note Content': note.content || '',
                     'Author': note.author || 'Anonymous',
                     'Votes': note.votes || 0,
-                    'Created At': note.createdAt ? new Date(note.createdAt).toLocaleString() : 'N/A'
+                    'Created At': note.createdAt ? new Date(note.createdAt).toLocaleString() : 'N/A',
+                    'Comments': note.comments ? Object.values(note.comments).map(c => `${c.author}: ${c.content}`).join('\n') : ''
                 });
             });
         });
@@ -159,7 +174,7 @@ const BoardPage = () => {
 
             const ws = XLSX.utils.json_to_sheet(exportData);
             const colWidths = [
-                { wch: 20 }, { wch: 50 }, { wch: 15 }, { wch: 10 }, { wch: 20 }
+                { wch: 20 }, { wch: 50 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 40 }
             ];
             ws['!cols'] = colWidths;
 
@@ -191,7 +206,7 @@ const BoardPage = () => {
                 return;
             }
 
-            const headers = ['Column', 'Note Content', 'Author', 'Votes', 'Created At'];
+            const headers = ['Column', 'Note Content', 'Author', 'Votes', 'Created At', 'Comments'];
             const csvRows = [headers.join(',')];
 
             exportData.forEach(row => {
@@ -200,7 +215,8 @@ const BoardPage = () => {
                     `"${row['Note Content'].replace(/"/g, '""')}"`,
                     `"${row['Author']}"`,
                     row['Votes'],
-                    `"${row['Created At']}"`
+                    `"${row['Created At']}"`,
+                    `"${row['Comments'].replace(/"/g, '""')}"`
                 ];
                 csvRows.push(values.join(','));
             });
@@ -273,20 +289,22 @@ const BoardPage = () => {
                     const tableData = columnNotes.map(note => [
                         note.content || '',
                         note.author || 'Anonymous',
-                        (note.votes || 0).toString()
+                        (note.votes || 0).toString(),
+                        note.comments ? Object.values(note.comments).map(c => `${c.author}: ${c.content}`).join('\n') : ''
                     ]);
 
                     autoTable(doc, {
                         startY: lastY + 5,
-                        head: [['Note', 'Author', 'Votes']],
+                        head: [['Note', 'Author', 'Votes', 'Comments']],
                         body: tableData,
                         theme: 'striped',
                         headStyles: { fillColor: [66, 66, 66] },
                         styles: { fontSize: 10, cellPadding: 3 },
                         columnStyles: {
                             0: { cellWidth: 'auto' },
-                            1: { cellWidth: 40 },
-                            2: { cellWidth: 20, halign: 'center' }
+                            1: { cellWidth: 30 },
+                            2: { cellWidth: 15, halign: 'center' },
+                            3: { cellWidth: 50 }
                         },
                         margin: { top: 20 },
                         didDrawPage: (data) => {
@@ -365,15 +383,6 @@ const BoardPage = () => {
         toast.success('Board ID copied!');
     };
 
-    // Determine grid columns based on number of columns
-    const getGridCols = () => {
-        const count = sortedColumns.length;
-        if (count <= 2) return 'grid-cols-1 md:grid-cols-2';
-        if (count <= 3) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-        if (count <= 4) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
-        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5';
-    };
-
     return (
         <Layout>
             {/* Animated Background - Pleasant Bubbles */}
@@ -442,8 +451,140 @@ const BoardPage = () => {
             />
 
             <div className="relative z-10 flex flex-col h-[calc(100vh-4rem)]">
-                {/* Header */}
-                <div className="flex flex-col gap-4 mb-6">
+
+                {/* === MOBILE HEADER (Single Line) === */}
+                <div className="md:hidden flex items-center justify-between p-3 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h1 className="text-xl font-bold text-gray-800 truncate">{boardName}</h1>
+                        <div className={`w-2 h-2 rounded-full ${isFirebaseReady ? 'bg-green-500' : 'bg-orange-500'} shadow-sm`} title={isFirebaseReady ? "Live" : "Local Mode"}></div>
+                    </div>
+
+                    <button
+                        onClick={() => setShowMobileMenu(true)}
+                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                    >
+                        <Menu size={24} />
+                    </button>
+                </div>
+
+                {/* === MOBILE MENU OVERLAY === */}
+                {showMobileMenu && (
+                    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setShowMobileMenu(false)}>
+                        <div className="absolute right-0 top-0 bottom-0 w-3/4 max-w-xs bg-white shadow-2xl p-4 flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                                <h2 className="font-bold text-gray-800 text-lg">Board Menu</h2>
+                                <button onClick={() => setShowMobileMenu(false)} className="p-1 text-gray-500 hover:bg-gray-100 rounded-full"><X size={24} /></button>
+                            </div>
+
+                            <div className="flex flex-col gap-4 overflow-y-auto">
+                                {/* Session Controls */}
+                                <div className="space-y-3">
+                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Session Controls</div>
+                                    <div className="flex flex-col gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                        <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
+                                        <div className="h-px bg-gray-200"></div>
+                                        <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
+                                        <div className="h-px bg-gray-200"></div>
+                                        <Poll
+                                            polls={polls}
+                                            activePoll={activePoll}
+                                            isAdmin={isAdmin}
+                                            onCreatePoll={createPoll}
+                                            onVotePoll={votePoll}
+                                            onClosePoll={closePoll}
+                                            onDeletePoll={deletePoll}
+                                            currentUserId={localStorage.getItem('crisp_user_id')}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Utilities */}
+                                <div className="space-y-3">
+                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tools</div>
+                                    <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                                        <Search size={16} className="text-gray-400 mr-2" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search notes..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="bg-transparent outline-none flex-1 text-sm"
+                                        />
+                                    </div>
+                                    <button onClick={handleShare} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors text-left text-gray-700">
+                                        <Share2 size={18} />
+                                        <span>Invite Others</span>
+                                    </button>
+                                    <div className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
+                                        <button
+                                            onClick={() => setShowUserList(!showUserList)}
+                                            className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors text-left text-gray-700"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <Users size={18} />
+                                                <span>Active Users ({onlineUsers.length})</span>
+                                            </div>
+                                            <ChevronDown size={16} className={`transition-transform ${showUserList ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {showUserList && (
+                                            <div className="px-3 pb-3 pt-0 bg-gray-50 max-h-40 overflow-y-auto">
+                                                <div className="h-px bg-gray-200 mb-2"></div>
+                                                {onlineUsers.length === 0 ? (
+                                                    <p className="text-sm text-gray-400 italic">No one else is here...</p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {onlineUsers.map(user => (
+                                                            <div key={user.id} className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
+                                                                    {user.name.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <span className="text-sm text-gray-600 truncate">{user.name}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Admin Actions */}
+                                {isAdmin && (
+                                    <div className="space-y-3">
+                                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</div>
+                                        <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                                            <button onClick={handleExportExcel} className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 text-left text-gray-700 transition-colors border-b border-gray-100">
+                                                <span>📊</span> Export Excel
+                                            </button>
+                                            <button onClick={handleExportPDF} className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 text-left text-gray-700 transition-colors border-b border-gray-100">
+                                                <span>📑</span> Export PDF
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm("Are you sure you want to clear all notes?")) clearAllNotes();
+                                                }}
+                                                className="w-full flex items-center gap-3 p-3 hover:bg-red-50 text-left text-red-600 transition-colors"
+                                            >
+                                                <Trash2 size={18} /> Clear Board
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
+                {/* === DESKTOP HEADER (Hidden on Mobile) === */}
+                <div className="hidden md:flex flex-col gap-4 mb-6">
                     {/* Top Row: Title & Main Info */}
                     <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -462,11 +603,8 @@ const BoardPage = () => {
                                     readOnly={!isAdmin}
                                     className={`text-2xl font-bold text-gray-800 bg-transparent border border-transparent rounded px-1 -ml-1 outline-none truncate transition-all ${isAdmin ? 'hover:border-gray-200 focus:border-blue-300' : 'cursor-default'}`}
                                 />
-
                             </div>
-
                         </div>
-
 
                         {/* Live/Local Indicator - Centered */}
                         <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 flex justify-center mt-2 md:mt-0 z-20 pointer-events-none">
@@ -504,8 +642,7 @@ const BoardPage = () => {
                                         )}
                                     </div>
                                 </button>
-
-                                {/* User List Dropdown */}
+                                {/* User List Dropdown (same as before) */}
                                 {showUserList && (
                                     <div className="absolute top-full right-0 mt-2 w-64 bg-white/90 backdrop-blur-md rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
                                         <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
@@ -520,11 +657,7 @@ const BoardPage = () => {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="text-sm font-medium text-gray-800 truncate">{user.name}</div>
-                                                        {user.id === localStorage.getItem('crisp_user_id') && (
-                                                            <div className="text-[10px] text-blue-500 font-medium">You</div>
-                                                        )}
                                                     </div>
-                                                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm animate-pulse"></div>
                                                 </div>
                                             ))}
                                         </div>
@@ -579,8 +712,6 @@ const BoardPage = () => {
                                     <span className="hidden sm:inline">Invite</span>
                                 </button>
 
-
-
                                 {/* Export - Admin Only */}
                                 {isAdmin && (
                                     <div className="relative" ref={exportMenuRef}>
@@ -632,43 +763,78 @@ const BoardPage = () => {
                     </div>
                 </div>
 
+                {/* Mobile Column Selector (Visible only on mobile) */}
+                <div className="md:hidden px-2 mb-2">
+                    <div className="relative">
+                        <select
+                            value={selectedMobileColumnId || ''}
+                            onChange={(e) => setSelectedMobileColumnId(e.target.value)}
+                            className="w-full appearance-none bg-white border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:bg-white focus:border-blue-500 shadow-sm font-semibold"
+                        >
+                            {sortedColumns.map(column => (
+                                <option key={column.id} value={column.id}>
+                                    {column.title}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-700">
+                            <ChevronDown size={20} />
+                        </div>
+                    </div>
+                </div>
+
                 {/* Board Container */}
-                <div className="flex-1 flex gap-4 overflow-hidden">
+                <div className="flex-1 flex gap-4 overflow-hidden h-full">
                     {/* Board Grid - Columns */}
                     <div
                         ref={boardRef}
-                        className="flex-1 flex gap-4 md:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
+                        className="flex-1 flex gap-4 md:gap-6 overflow-y-hidden md:overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
                     >
-                        {sortedColumns.map(column => (
-                            <div
-                                key={column.id}
-                                className="snap-center shrink-0 w-[85vw] sm:w-[50vw] md:w-[45vw] lg:flex-1 lg:min-w-[300px] xl:max-w-md transition-all duration-300"
-                            >
-                                <Column
-                                    column={column}
-                                    notes={getNotesByColumn(column.id)}
-                                    onAddNote={handleAddNote}
-                                    onUpdateNote={updateNote}
-                                    onDeleteNote={deleteNote}
-                                    onVoteNote={voteNote}
-                                    onReactNote={reactNote}
-                                    onMoveNote={moveNote}
-                                    onUpdateColumn={updateColumn}
-                                    onDeleteColumn={deleteColumn}
-                                    currentUser={currentUser}
-                                    currentUserId={localStorage.getItem('crisp_user_id')}
-                                    isAdmin={isAdmin}
-                                    searchQuery={searchQuery}
-                                />
-                            </div>
-                        ))}
+                        {sortedColumns.map(column => {
+                            // On mobile, only render the selected column
+                            // On desktop (md and up), render all columns
+                            const isMobileHidden = selectedMobileColumnId && column.id !== selectedMobileColumnId;
+
+                            return (
+                                <div
+                                    key={column.id}
+                                    className={`
+                                        snap-center shrink-0 h-full
+                                        transition-all duration-300
+                                        ${isMobileHidden ? 'hidden md:block' : 'block w-full'} 
+                                        md:w-[45vw] lg:flex-1 lg:min-w-[300px] xl:max-w-md
+                                    `}
+                                >
+                                    <Column
+                                        column={column}
+                                        notes={getNotesByColumn(column.id)}
+                                        onAddNote={handleAddNote}
+                                        onUpdateNote={updateNote}
+                                        onDeleteNote={deleteNote}
+                                        onVoteNote={voteNote}
+                                        onReactNote={reactNote}
+                                        onMoveNote={moveNote}
+                                        onAddComment={addComment}
+                                        onUpdateComment={updateComment}
+                                        onDeleteComment={deleteComment}
+                                        onUpdateColumn={updateColumn}
+                                        onDeleteColumn={deleteColumn}
+                                        currentUser={currentUser}
+                                        currentUserId={localStorage.getItem('crisp_user_id')}
+                                        isAdmin={isAdmin}
+                                        searchQuery={searchQuery}
+                                        hideTitleOnMobile={true} // Clean up mobile view by hiding redundant title
+                                    />
+                                </div>
+                            );
+                        })}
                     </div>
 
-                    {/* Add Column Button - Admin Only (Right side) */}
+                    {/* Add Column Button - Admin Only (Right side - Desktop Only) */}
                     {isAdmin && (
                         <button
                             onClick={() => setShowAddColumnModal(true)}
-                            className="flex-shrink-0 w-14 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 hover:border-blue-400 bg-gray-50 hover:bg-blue-50 transition-all group cursor-pointer"
+                            className="hidden md:flex flex-shrink-0 w-14 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 hover:border-blue-400 bg-gray-50 hover:bg-blue-50 transition-all group cursor-pointer"
                             title="Add Column"
                         >
                             <div className="w-10 h-10 rounded-full bg-gray-200 group-hover:bg-blue-200 flex items-center justify-center transition-colors">
@@ -677,6 +843,16 @@ const BoardPage = () => {
                         </button>
                     )}
                 </div>
+
+                {/* Add Column FAB - Mobile Only */}
+                {isAdmin && (
+                    <button
+                        onClick={() => setShowAddColumnModal(true)}
+                        className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center z-50 hover:bg-blue-700 active:scale-95 transition-all"
+                    >
+                        <Plus size={24} />
+                    </button>
+                )}
 
                 {/* Add Column Modal */}
                 {showAddColumnModal && (
