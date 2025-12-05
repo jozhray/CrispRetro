@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Users, Sparkles, TrendingUp } from 'lucide-react';
 import Layout from '../components/Layout';
+import Tour, { HOME_TOUR_STEPS } from '../components/Tour';
+import { useToast } from '../components/Toast';
 import { database } from '../firebase';
 import { ref, set, get } from 'firebase/database';
 
@@ -11,6 +13,7 @@ const Home = () => {
     const [boardId, setBoardId] = useState('');
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const toast = useToast();
 
     useEffect(() => {
         // Ensure user has a unique ID
@@ -65,8 +68,14 @@ const Home = () => {
     };
 
     const handleCreateBoard = async () => {
-        if (!name.trim()) return alert('Please enter your name first');
-        if (!boardName.trim()) return alert('Please enter a board name');
+        if (!name.trim()) {
+            toast.warning('Please enter your name first');
+            return;
+        }
+        if (!boardName.trim()) {
+            toast.warning('Please enter a board name');
+            return;
+        }
 
         localStorage.setItem('crisp_user_name', name);
         const userId = localStorage.getItem('crisp_user_id');
@@ -78,7 +87,7 @@ const Home = () => {
             notes: {},
             timer: {
                 isRunning: false,
-                timeLeft: 0,
+                timeLeft: 180,
                 lastUpdated: Date.now()
             },
             music: {
@@ -101,13 +110,17 @@ const Home = () => {
 
     const handleJoinBoard = async (e) => {
         e.preventDefault();
-        if (!name.trim()) return alert('Please enter your name first');
+        if (!name.trim()) {
+            toast.warning('Please enter your name first');
+            return;
+        }
         if (!boardId.trim()) return;
 
         // Check for duplicate username
         const isDuplicate = await checkDuplicateUsername(boardId, name);
         if (isDuplicate) {
-            return alert(`The name "${name}" is already taken in this board.\n\nPlease use:\n• Your full name (e.g., "${name} Smith")\n• An alternate name (e.g., "${name}2" or "${name}_dev")\n\nThis helps avoid confusion in the retro session.`);
+            toast.error(`The name "${name}" is already taken. Please use a different name.`);
+            return;
         }
 
         localStorage.setItem('crisp_user_name', name);
@@ -116,6 +129,8 @@ const Home = () => {
 
     return (
         <Layout>
+            {/* Onboarding Tour */}
+            <Tour steps={HOME_TOUR_STEPS} storageKey="crisp_home_tour_completed" />
             <div className="min-h-screen relative overflow-hidden">
                 {/* Animated Background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -149,36 +164,42 @@ const Home = () => {
                 </div>
 
                 {/* Content */}
-                <div className="relative z-10 max-w-4xl mx-auto px-4 pt-20 pb-32">
+                <div className="relative z-10 max-w-4xl mx-auto px-4 pt-8 pb-8">
                     {/* Hero Section */}
-                    <div className="text-center mb-16">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-400/30 rounded-full text-cyan-300 text-sm mb-6 backdrop-blur-sm">
+                    <div className="text-center mb-8">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-400/30 rounded-full text-cyan-300 text-sm mb-4 backdrop-blur-sm">
                             <Sparkles size={16} className="animate-pulse" />
                             <span>Next-Gen Retrospective Platform</span>
                         </div>
 
-                        <h1 className="text-6xl md:text-7xl font-bold mb-6">
+                        {/* Logo + Title Inline */}
+                        <h1 className="flex items-center justify-center gap-4 text-5xl md:text-6xl font-bold mb-4">
+                            <img
+                                src="/logo.png"
+                                alt="CrispRetro Logo"
+                                className="w-16 h-16 md:w-20 md:h-20 drop-shadow-[0_0_30px_rgba(6,182,212,0.4)]"
+                            />
                             <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(6,182,212,0.3)]">
                                 CrispRetro
                             </span>
                         </h1>
 
-                        <p className="text-xl md:text-2xl text-gray-300 mb-4 drop-shadow-lg">
+                        <p className="text-lg md:text-xl text-gray-300 mb-3 drop-shadow-lg">
                             Transform your team retrospectives with
                         </p>
-                        <div className="flex flex-wrap items-center justify-center gap-4 text-cyan-300">
+                        <div className="flex flex-wrap items-center justify-center gap-4 text-cyan-300 text-sm">
                             <div className="flex items-center gap-2">
-                                <TrendingUp size={20} className="text-pink-400" />
+                                <TrendingUp size={18} className="text-pink-400" />
                                 <span>Real-time Collaboration</span>
                             </div>
                             <span className="text-gray-600">•</span>
                             <div className="flex items-center gap-2">
-                                <Sparkles size={20} className="text-cyan-400" />
+                                <Sparkles size={18} className="text-cyan-400" />
                                 <span>Smart Analytics</span>
                             </div>
                             <span className="text-gray-600">•</span>
                             <div className="flex items-center gap-2">
-                                <Users size={20} className="text-purple-400" />
+                                <Users size={18} className="text-purple-400" />
                                 <span>Team Insights</span>
                             </div>
                         </div>
@@ -225,8 +246,9 @@ const Home = () => {
 
                                     {/* Create Button */}
                                     <button
+                                        type="button"
                                         onClick={handleCreateBoard}
-                                        className="w-full relative group/btn overflow-hidden"
+                                        className="w-full relative group/btn overflow-hidden rounded-xl"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 opacity-100 group-hover/btn:opacity-90 transition-opacity"></div>
                                         <div className="relative flex items-center justify-center gap-2 py-4 px-6 font-semibold text-white">

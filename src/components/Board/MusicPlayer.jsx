@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Music, Volume2, VolumeX } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Music, Volume2 } from 'lucide-react';
 
 const TRACKS = [
     { name: 'Lofi Study', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112721.mp3' },
@@ -18,14 +18,35 @@ const TRACKS = [
 
 const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
     const audioRef = useRef(new Audio(TRACKS[0].url));
-    const [isMuted, setIsMuted] = React.useState(false);
+    const [volume, setVolume] = useState(0.5);
+    const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+    const volumeRef = useRef(null);
+
+    // Close volume slider when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (volumeRef.current && !volumeRef.current.contains(e.target)) {
+                setShowVolumeSlider(false);
+            }
+        };
+        if (showVolumeSlider) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showVolumeSlider]);
 
     useEffect(() => {
         audioRef.current.loop = true;
+        audioRef.current.volume = volume;
         return () => {
             audioRef.current.pause();
         };
     }, []);
+
+    // Handle volume changes
+    useEffect(() => {
+        audioRef.current.volume = volume;
+    }, [volume]);
 
     // Handle Track Changes
     useEffect(() => {
@@ -47,10 +68,6 @@ const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
         }
     }, [music.isPlaying]);
 
-    useEffect(() => {
-        audioRef.current.muted = isMuted;
-    }, [isMuted]);
-
     const togglePlay = () => {
         if (!isAdmin) return;
         onUpdateMusic({ ...music, isPlaying: !music.isPlaying });
@@ -62,15 +79,15 @@ const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
     };
 
     return (
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-            <Music size={16} className={music.isPlaying ? "text-purple-600 animate-pulse" : "text-gray-400"} />
+        <div className="flex items-center gap-3 bg-gradient-to-r from-purple-900 to-indigo-900 px-4 py-2 rounded-xl shadow-lg h-[46px]">
+            <Music size={16} className={music.isPlaying ? "text-purple-300 animate-pulse" : "text-purple-400"} />
 
             {isAdmin ? (
                 <div className="flex items-center gap-2">
                     <select
                         value={music.currentTrack || TRACKS[0].url}
                         onChange={handleTrackChange}
-                        className="text-xs border-none bg-gray-50 rounded px-2 py-1 outline-none cursor-pointer max-w-[100px] truncate"
+                        className="text-xs border-none bg-purple-800/50 text-purple-100 rounded px-2 py-1 outline-none cursor-pointer max-w-[100px] truncate"
                     >
                         {TRACKS.map(track => (
                             <option key={track.url} value={track.url}>{track.name}</option>
@@ -78,24 +95,58 @@ const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
                     </select>
                     <button
                         onClick={togglePlay}
-                        className={`text-xs font-medium px-2 py-1 rounded ${music.isPlaying ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`text-xs font-medium px-3 py-1 rounded-lg transition-all ${music.isPlaying
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-purple-700 text-purple-200 hover:bg-purple-600'
+                            }`}
                     >
                         {music.isPlaying ? 'Stop' : 'Play'}
                     </button>
                 </div>
             ) : (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-purple-300">
                     {music.isPlaying ? 'Music Playing...' : 'No Music'}
                 </span>
             )}
 
-            <button
-                onClick={() => setIsMuted(!isMuted)}
-                className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 ml-1"
-                title={isMuted ? "Unmute" : "Mute"}
-            >
-                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-            </button>
+            {/* Volume Slider */}
+            <div className="relative" ref={volumeRef}>
+                <button
+                    onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+                    className={`p-1.5 rounded-lg transition-all ${volume === 0
+                        ? 'bg-red-500/20 text-red-400'
+                        : 'bg-purple-700/50 hover:bg-purple-600/50 text-purple-300'
+                        }`}
+                    title="Music Volume"
+                >
+                    <Volume2 size={14} />
+                </button>
+
+                {showVolumeSlider && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 p-3 bg-purple-900 rounded-xl shadow-xl border border-purple-700 min-w-[140px] z-50">
+                        <div className="text-xs text-purple-300 mb-2 text-center">Music Volume</div>
+                        <div className="relative h-2 bg-purple-800 rounded-full overflow-hidden">
+                            <div
+                                className="absolute h-full bg-gradient-to-r from-pink-500 to-purple-400 rounded-full transition-all"
+                                style={{ width: `${volume * 100}%` }}
+                            />
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.1"
+                                value={volume}
+                                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                            />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-purple-400 mt-1">
+                            <span>Mute</span>
+                            <span>{Math.round(volume * 100)}%</span>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

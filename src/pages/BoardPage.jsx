@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown } from 'lucide-react';
+import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -8,32 +8,51 @@ import Layout from '../components/Layout';
 import Column from '../components/Board/Column';
 import Timer from '../components/Board/Timer';
 import MusicPlayer from '../components/Board/MusicPlayer';
-import { useBoard } from '../store/useBoard';
+import Poll from '../components/Board/Poll';
+import Tour, { BOARD_TOUR_STEPS_ADMIN, BOARD_TOUR_STEPS_USER } from '../components/Tour';
+import { useToast } from '../components/Toast';
+import { useBoard, COLUMN_COLORS } from '../store/useBoard';
 
 const BoardPage = () => {
     const { boardId } = useParams();
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showAddColumnModal, setShowAddColumnModal] = useState(false);
+    const [newColumnTitle, setNewColumnTitle] = useState('');
+    const [selectedColor, setSelectedColor] = useState(COLUMN_COLORS[4]); // Default blue
     const boardRef = useRef(null);
     const currentUser = localStorage.getItem('crisp_user_name') || 'Anonymous';
+    const toast = useToast();
 
     const {
         columns,
+        sortedColumns,
         notes,
         boardName,
         isFirebaseReady,
         isAdmin,
         timer,
         music,
+        polls,
+        activePoll,
+        addColumn,
+        updateColumn,
+        deleteColumn,
         addNote,
         updateNote,
         deleteNote,
         voteNote,
+        reactNote,
+        moveNote,
         getNotesByColumn,
         updateBoardName,
         updateTimer,
-        updateMusic
+        updateMusic,
+        createPoll,
+        votePoll,
+        closePoll,
+        deletePoll
     } = useBoard(boardId);
 
     // Redirect if no user name found
@@ -49,6 +68,14 @@ const BoardPage = () => {
     const handleAddNote = (columnId) => {
         const currentUserId = localStorage.getItem('crisp_user_id');
         addNote(columnId, '', currentUser, currentUserId);
+    };
+
+    const handleAddColumn = () => {
+        if (!newColumnTitle.trim()) return;
+        addColumn(newColumnTitle.trim(), selectedColor);
+        setNewColumnTitle('');
+        setSelectedColor(COLUMN_COLORS[4]);
+        setShowAddColumnModal(false);
     };
 
     const prepareExportData = () => {
@@ -71,7 +98,10 @@ const BoardPage = () => {
     const handleExportExcel = () => {
         try {
             const exportData = prepareExportData();
-            if (exportData.length === 0) return alert('No notes to export!');
+            if (exportData.length === 0) {
+                toast.warning('No notes to export!');
+                return;
+            }
 
             const ws = XLSX.utils.json_to_sheet(exportData);
             const colWidths = [
@@ -81,18 +111,23 @@ const BoardPage = () => {
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Retro Board");
-            XLSX.writeFile(wb, `${boardName.replace(/\s+/g, '-').toLowerCase()}-${boardId}.xlsx`);
+            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+            XLSX.writeFile(wb, `${boardName.replace(/\s+/g, '-')}_${timestamp}.xlsx`);
             setShowExportMenu(false);
+            toast.success('Exported to Excel!');
         } catch (err) {
             console.error('Export failed', err);
-            alert('Failed to export to Excel');
+            toast.error('Failed to export to Excel');
         }
     };
 
     const handleExportCSV = () => {
         try {
             const exportData = prepareExportData();
-            if (exportData.length === 0) return alert('No notes to export!');
+            if (exportData.length === 0) {
+                toast.warning('No notes to export!');
+                return;
+            }
 
             const headers = ['Column', 'Note Content', 'Author', 'Votes', 'Created At'];
             const csvRows = [headers.join(',')];
@@ -113,20 +148,25 @@ const BoardPage = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${boardName.replace(/\s+/g, '-').toLowerCase()}-${boardId}.csv`;
+            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+            a.download = `${boardName.replace(/\s+/g, '-')}_${timestamp}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
             setShowExportMenu(false);
+            toast.success('Exported to CSV!');
         } catch (err) {
             console.error('CSV export failed', err);
-            alert('Failed to export to CSV');
+            toast.error('Failed to export to CSV');
         }
     };
 
     const handleExportPDF = () => {
         try {
             const exportData = prepareExportData();
-            if (exportData.length === 0) return alert('No notes to export!');
+            if (exportData.length === 0) {
+                toast.warning('No notes to export!');
+                return;
+            }
 
             const doc = new jsPDF();
 
@@ -167,11 +207,13 @@ const BoardPage = () => {
                 }
             });
 
-            doc.save(`${boardName.replace(/\s+/g, '-').toLowerCase()}-${boardId}.pdf`);
+            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+            doc.save(`${boardName.replace(/\s+/g, '-')}_${timestamp}.pdf`);
             setShowExportMenu(false);
+            toast.success('Exported to PDF!');
         } catch (err) {
             console.error('PDF export failed', err);
-            alert('Failed to export to PDF');
+            toast.error('Failed to export to PDF');
         }
     };
 
@@ -194,31 +236,48 @@ const BoardPage = () => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${boardName.replace(/\s+/g, '-').toLowerCase()}-${boardId}.json`;
+            const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+            a.download = `${boardName.replace(/\s+/g, '-')}_${timestamp}.json`;
             a.click();
             window.URL.revokeObjectURL(url);
             setShowExportMenu(false);
+            toast.success('Exported to JSON!');
         } catch (err) {
             console.error('JSON export failed', err);
-            alert('Failed to export to JSON');
+            toast.error('Failed to export to JSON');
         }
     };
 
     const handleShare = () => {
         if (!isFirebaseReady) {
-            alert('Warning: You are in Local Mode. Other users cannot see your changes until you configure Firebase.');
+            toast.warning('Local Mode: Others cannot see your changes until Firebase is configured.');
         }
         navigator.clipboard.writeText(window.location.href);
-        alert('Board link copied to clipboard!');
+        toast.success('Board link copied to clipboard!');
     };
 
     const copyBoardId = () => {
         navigator.clipboard.writeText(boardId);
-        alert('Board ID copied!');
+        toast.success('Board ID copied!');
+    };
+
+    // Determine grid columns based on number of columns
+    const getGridCols = () => {
+        const count = sortedColumns.length;
+        if (count <= 2) return 'grid-cols-1 md:grid-cols-2';
+        if (count <= 3) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+        if (count <= 4) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
+        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5';
     };
 
     return (
         <Layout>
+            {/* Onboarding Tour - Different steps for admin vs user */}
+            <Tour
+                steps={isAdmin ? BOARD_TOUR_STEPS_ADMIN : BOARD_TOUR_STEPS_USER}
+                storageKey={isAdmin ? 'crisp_board_admin_tour_completed' : 'crisp_board_user_tour_completed'}
+            />
+
             <div className="flex flex-col h-[calc(100vh-4rem)]">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -257,8 +316,18 @@ const BoardPage = () => {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} />
+                        <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
                         <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
+                        <Poll
+                            polls={polls}
+                            activePoll={activePoll}
+                            isAdmin={isAdmin}
+                            onCreatePoll={createPoll}
+                            onVotePoll={votePoll}
+                            onClosePoll={closePoll}
+                            onDeletePoll={deletePoll}
+                            currentUserId={localStorage.getItem('crisp_user_id')}
+                        />
 
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -321,27 +390,116 @@ const BoardPage = () => {
                     </div>
                 </div>
 
-                {/* Board Grid */}
-                <div
-                    ref={boardRef}
-                    className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-x-auto pb-4"
-                >
-                    {Object.values(columns).map(column => (
-                        <Column
-                            key={column.id}
-                            column={column}
-                            notes={getNotesByColumn(column.id)}
-                            onAddNote={handleAddNote}
-                            onUpdateNote={updateNote}
-                            onDeleteNote={deleteNote}
-                            onVoteNote={voteNote}
-                            currentUser={currentUser}
-                            currentUserId={localStorage.getItem('crisp_user_id')}
-                            isAdmin={isAdmin}
-                            searchQuery={searchQuery}
-                        />
-                    ))}
+                {/* Board Container */}
+                <div className="flex-1 flex gap-4 overflow-hidden">
+                    {/* Board Grid - Columns */}
+                    <div
+                        ref={boardRef}
+                        className={`flex-1 flex gap-6 overflow-x-auto pb-4 ${sortedColumns.length <= 4 ? '' : ''}`}
+                    >
+                        {sortedColumns.map(column => (
+                            <div
+                                key={column.id}
+                                className={sortedColumns.length <= 4 ? 'flex-1 min-w-[250px]' : 'flex-shrink-0 w-80'}
+                            >
+                                <Column
+                                    column={column}
+                                    notes={getNotesByColumn(column.id)}
+                                    onAddNote={handleAddNote}
+                                    onUpdateNote={updateNote}
+                                    onDeleteNote={deleteNote}
+                                    onVoteNote={voteNote}
+                                    onReactNote={reactNote}
+                                    onMoveNote={moveNote}
+                                    onUpdateColumn={updateColumn}
+                                    onDeleteColumn={deleteColumn}
+                                    currentUser={currentUser}
+                                    currentUserId={localStorage.getItem('crisp_user_id')}
+                                    isAdmin={isAdmin}
+                                    searchQuery={searchQuery}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add Column Button - Admin Only (Right side) */}
+                    {isAdmin && (
+                        <button
+                            onClick={() => setShowAddColumnModal(true)}
+                            className="flex-shrink-0 w-14 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 hover:border-blue-400 bg-gray-50 hover:bg-blue-50 transition-all group cursor-pointer"
+                            title="Add Column"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-gray-200 group-hover:bg-blue-200 flex items-center justify-center transition-colors">
+                                <Plus size={20} className="text-gray-500 group-hover:text-blue-600" />
+                            </div>
+                        </button>
+                    )}
                 </div>
+
+                {/* Add Column Modal */}
+                {showAddColumnModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddColumnModal(false)}>
+                        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold text-gray-800">Add New Column</h3>
+                                <button
+                                    onClick={() => setShowAddColumnModal(false)}
+                                    className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Column Title</label>
+                                <input
+                                    type="text"
+                                    value={newColumnTitle}
+                                    onChange={(e) => setNewColumnTitle(e.target.value)}
+                                    placeholder="e.g., Action Items"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddColumn();
+                                    }}
+                                />
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                                <div className="grid grid-cols-6 gap-2">
+                                    {COLUMN_COLORS.map((colorOption) => (
+                                        <button
+                                            key={colorOption.id}
+                                            onClick={() => setSelectedColor(colorOption)}
+                                            className={`w-10 h-10 rounded-lg ${colorOption.color} border-2 transition-all ${selectedColor.id === colorOption.id
+                                                ? 'ring-2 ring-blue-500 ring-offset-2 scale-110'
+                                                : 'hover:scale-105'
+                                                }`}
+                                            title={colorOption.id}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowAddColumnModal(false)}
+                                    className="flex-1 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddColumn}
+                                    disabled={!newColumnTitle.trim()}
+                                    className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                                >
+                                    Add Column
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </Layout>
     );

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import BoardPage from './pages/BoardPage';
+import { ToastProvider } from './components/Toast';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -39,14 +40,17 @@ class ErrorBoundary extends React.Component {
 function App() {
   return (
     <ErrorBoundary>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/board/:boardId" element={<BoardPage />} />
-        </Routes>
-      </Router>
+      <ToastProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/board/:boardId" element={<BoardPage />} />
+          </Routes>
+        </Router>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }
 
 export default App;
+
