@@ -28,6 +28,7 @@ export const useBoard = (boardId) => {
     const [timer, setTimer] = useState({ isRunning: false, timeLeft: 180 });
     const [music, setMusic] = useState({ isPlaying: false });
     const [polls, setPolls] = useState({});
+    const [onlineUsers, setOnlineUsers] = useState([]);
     const [isFirebaseReady, setIsFirebaseReady] = useState(false);
 
     const currentUser = localStorage.getItem('crisp_user_name');
@@ -40,6 +41,32 @@ export const useBoard = (boardId) => {
             setIsFirebaseReady(true);
         }
     }, []);
+
+    // Track online users - add current user when joining, remove when leaving
+    useEffect(() => {
+        if (!boardId || !database || !currentUserId || !currentUser) return;
+
+        const userRef = ref(database, `boards/${boardId}/onlineUsers/${currentUserId}`);
+
+        // Add user to online users
+        set(userRef, {
+            id: currentUserId,
+            name: currentUser,
+            joinedAt: Date.now()
+        });
+
+        // Remove user when they leave
+        const cleanup = () => {
+            remove(userRef);
+        };
+
+        window.addEventListener('beforeunload', cleanup);
+
+        return () => {
+            window.removeEventListener('beforeunload', cleanup);
+            cleanup();
+        };
+    }, [boardId, currentUserId, currentUser]);
 
     // Load data (Firebase or LocalStorage)
     useEffect(() => {
@@ -58,11 +85,15 @@ export const useBoard = (boardId) => {
                     setTimer(data.timer || { isRunning: false, timeLeft: 180 });
                     setMusic(data.music || { isPlaying: false });
                     setPolls(data.polls || {});
+                    // Convert online users object to array
+                    const users = data.onlineUsers ? Object.values(data.onlineUsers) : [];
+                    setOnlineUsers(users);
                 } else {
                     setNotes({});
                     setColumns(DEFAULT_COLUMNS);
                     setBoardName('Sprint Retro');
                     setAdminId(null);
+                    setOnlineUsers([]);
                 }
             });
             return () => unsubscribe();
@@ -227,6 +258,7 @@ export const useBoard = (boardId) => {
                 newVotes = (note.votes || 0) + 1;
             }
 
+            // Optimistic update
             const updatedNotes = {
                 ...prev,
                 [noteId]: {
@@ -235,10 +267,25 @@ export const useBoard = (boardId) => {
                     votedBy: updatedVotedBy
                 }
             };
-            saveData({ notes: updatedNotes });
+
+            // Atomic Firebase Update
+            if (database && boardId) {
+                const noteRef = ref(database, `boards/${boardId}/notes/${noteId}`);
+                update(noteRef, {
+                    votes: newVotes,
+                    votedBy: updatedVotedBy
+                }).catch(err => {
+                    console.error("Failed to update vote:", err);
+                    // Optionally revert here, but usually retry or sync handles it
+                });
+            } else {
+                // Fallback for LocalStorage
+                saveData({ notes: updatedNotes });
+            }
+
             return updatedNotes;
         });
-    }, [saveData]);
+    }, [boardId, saveData]);
 
     const reactNote = useCallback((noteId, emoji) => {
         const userId = localStorage.getItem('crisp_user_id');
@@ -392,6 +439,12 @@ export const useBoard = (boardId) => {
         });
     }, [saveData]);
 
+    // Clear all notes (Admin only)
+    const clearAllNotes = useCallback(() => {
+        setNotes({});
+        saveData({ notes: null }); // Passing null removes the node in Firebase
+    }, [saveData]);
+
     // Get sorted columns
     const sortedColumns = Object.values(columns).sort((a, b) => (a.order || 0) - (b.order || 0));
 
@@ -409,6 +462,7 @@ export const useBoard = (boardId) => {
         music,
         polls,
         activePoll,
+        onlineUsers,
         addColumn,
         updateColumn,
         deleteColumn,
@@ -425,7 +479,8 @@ export const useBoard = (boardId) => {
         createPoll,
         votePoll,
         closePoll,
-        deletePoll
+        deletePoll,
+        clearAllNotes
     };
 };
 

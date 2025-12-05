@@ -27,7 +27,11 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId
         setLastVoteCount(note.votes || 0);
     }, [note.votes]);
 
+    // Check if note has content
+    const hasContent = note.content && note.content.trim().length > 0;
+
     const handleVote = () => {
+        if (!hasContent) return;
         // Only show animation if we're adding a vote, not removing
         if (!hasVoted) {
             setShowVoteAnimation(true);
@@ -128,14 +132,17 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, currentUser, currentUserId
                 <div className="flex items-center gap-2">
                     <motion.button
                         onClick={handleVote}
-                        whileTap={{ scale: 0.9 }}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${hasVoted
-                            ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-300'
-                            : note.votes > 0
-                                ? 'bg-blue-50 text-blue-600'
-                                : 'hover:bg-gray-100'
+                        whileTap={hasContent ? { scale: 0.9 } : {}}
+                        disabled={!hasContent}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${!hasContent
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                            : hasVoted
+                                ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-300'
+                                : note.votes > 0
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'hover:bg-gray-100'
                             }`}
-                        title={hasVoted ? "Click to remove your vote" : "Click to vote"}
+                        title={!hasContent ? "Add content to vote" : (hasVoted ? "Click to remove your vote" : "Click to vote")}
                     >
                         <motion.div
                             animate={showVoteAnimation ? { rotate: [0, -20, 20, -10, 10, 0], scale: [1, 1.2, 1] } : {}}

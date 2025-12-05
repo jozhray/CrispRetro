@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X } from 'lucide-react';
+import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Layout from '../components/Layout';
 import Column from '../components/Board/Column';
 import Timer from '../components/Board/Timer';
@@ -22,6 +23,7 @@ const BoardPage = () => {
     const [newColumnTitle, setNewColumnTitle] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLUMN_COLORS[4]); // Default blue
     const boardRef = useRef(null);
+    const exportMenuRef = useRef(null);
     const currentUser = localStorage.getItem('crisp_user_name') || 'Anonymous';
     const toast = useToast();
 
@@ -36,6 +38,7 @@ const BoardPage = () => {
         music,
         polls,
         activePoll,
+        onlineUsers,
         addColumn,
         updateColumn,
         deleteColumn,
@@ -52,7 +55,8 @@ const BoardPage = () => {
         createPoll,
         votePoll,
         closePoll,
-        deletePoll
+        deletePoll,
+        clearAllNotes
     } = useBoard(boardId);
 
     // Redirect if no user name found
@@ -69,6 +73,22 @@ const BoardPage = () => {
         const currentUserId = localStorage.getItem('crisp_user_id');
         addNote(columnId, '', currentUser, currentUserId);
     };
+
+    // Close Export Menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+                setShowExportMenu(false);
+            }
+        };
+
+        if (showExportMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showExportMenu]);
 
     const handleAddColumn = () => {
         if (!newColumnTitle.trim()) return;
@@ -206,40 +226,61 @@ const BoardPage = () => {
 
             const doc = new jsPDF();
 
-            doc.setFontSize(18);
-            doc.text(boardName, 20, 20);
+            // Header
+            doc.setFontSize(22);
+            doc.setTextColor(41, 128, 185); // Blue color
+            doc.text(boardName, 14, 20);
 
             doc.setFontSize(10);
-            doc.text(`Board ID: ${boardId}`, 20, 28);
-            doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 34);
+            doc.setTextColor(100);
+            doc.text(`Board ID: ${boardId}`, 14, 28);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
 
-            let yPos = 45;
-            doc.setFontSize(12);
+            let lastY = 45;
 
+            // Group notes by column for better display
             Object.values(columns).forEach(column => {
-                const columnNotes = getNotesByColumn(column.id);
-                if (columnNotes.length > 0) {
-                    doc.setFont(undefined, 'bold');
-                    doc.text(column.title, 20, yPos);
-                    yPos += 7;
-                    doc.setFont(undefined, 'normal');
+                const columnNotes = Object.values(notes)
+                    .filter(note => note.columnId === column.id)
+                    .sort((a, b) => (b.votes || 0) - (a.votes || 0));
 
-                    columnNotes.forEach(note => {
-                        const lines = doc.splitTextToSize(note.content || '(empty)', 170);
-                        lines.forEach(line => {
-                            if (yPos > 270) {
-                                doc.addPage();
-                                yPos = 20;
-                            }
-                            doc.text(`• ${line}`, 25, yPos);
-                            yPos += 5;
-                        });
-                        doc.setFontSize(9);
-                        doc.text(`  Author: ${note.author} | Votes: ${note.votes || 0}`, 25, yPos);
-                        yPos += 7;
-                        doc.setFontSize(12);
+                if (columnNotes.length > 0) {
+                    // Column Title
+                    doc.setFontSize(14);
+                    doc.setTextColor(0);
+                    // Check if we need a new page for the title
+                    if (lastY > 250) {
+                        doc.addPage();
+                        lastY = 20;
+                    }
+                    doc.text(column.title, 14, lastY);
+
+                    // Table
+                    const tableData = columnNotes.map(note => [
+                        note.content || '',
+                        note.author || 'Anonymous',
+                        (note.votes || 0).toString()
+                    ]);
+
+                    autoTable(doc, {
+                        startY: lastY + 5,
+                        head: [['Note', 'Author', 'Votes']],
+                        body: tableData,
+                        theme: 'striped',
+                        headStyles: { fillColor: [66, 66, 66] },
+                        styles: { fontSize: 10, cellPadding: 3 },
+                        columnStyles: {
+                            0: { cellWidth: 'auto' },
+                            1: { cellWidth: 40 },
+                            2: { cellWidth: 20, halign: 'center' }
+                        },
+                        margin: { top: 20 },
+                        didDrawPage: (data) => {
+                            // Optional: Header on new pages could go here
+                        }
                     });
-                    yPos += 3;
+
+                    lastY = doc.lastAutoTable.finalY + 15;
                 }
             });
 
@@ -247,6 +288,7 @@ const BoardPage = () => {
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const safeName = boardName.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             doc.save(`${safeName}_${timestamp}.pdf`);
+
             setShowExportMenu(false);
             toast.success('Exported to PDF!');
         } catch (err) {
@@ -254,6 +296,7 @@ const BoardPage = () => {
             toast.error('Failed to export to PDF');
         }
     };
+
 
     const handleExportJSON = () => {
         try {
@@ -317,120 +360,221 @@ const BoardPage = () => {
 
     return (
         <Layout>
+            {/* Animated Background - Pleasant Bubbles */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-200 via-blue-100 to-indigo-200">
+                {/* Floating Crisp Bubbles */}
+                <div className="absolute inset-0 opacity-60">
+                    {[...Array(15)].map((_, i) => (
+                        <div
+                            key={i}
+                            className="absolute rounded-full border-2 border-blue-400/40 bg-blue-300/10 animate-float"
+                            style={{
+                                width: Math.random() * 80 + 30 + 'px',
+                                height: Math.random() * 80 + 30 + 'px',
+                                left: Math.random() * 100 + '%',
+                                bottom: -100 + 'px',
+                                animationDelay: Math.random() * 5 + 's',
+                                animationDuration: Math.random() * 15 + 15 + 's',
+                            }}
+                        />
+                    ))}
+                </div>
+
+                {/* Gentle Wave Effect */}
+                <div className="absolute bottom-0 left-0 right-0 h-1/3 opacity-60">
+                    <div className="absolute bottom-0 left-0 w-[200%] h-full bg-gradient-to-t from-blue-300/30 via-blue-200/10 to-transparent animate-wave"
+                        style={{ transform: 'translate3d(0,0,0)' }}></div>
+                    <div className="absolute bottom-0 left-0 w-[200%] h-3/4 bg-gradient-to-t from-indigo-300/20 via-purple-200/10 to-transparent animate-wave-slow"
+                        style={{ transform: 'translate3d(0,0,0)', animationDelay: '-5s' }}></div>
+                </div>
+            </div>
+
+            <style>{`
+                @keyframes float {
+                    0% { transform: translateY(0) translateX(0); opacity: 0; }
+                    10% { opacity: 1; }
+                    90% { opacity: 1; }
+                    100% { transform: translateY(-110vh) translateX(20px); opacity: 0; }
+                }
+                @keyframes wave {
+                    0% { transform: translateX(0); }
+                    50% { transform: translateX(-50%); }
+                    100% { transform: translateX(0); }
+                }
+                @keyframes wave-slow {
+                    0% { transform: translateX(-50%); }
+                    50% { transform: translateX(0); }
+                    100% { transform: translateX(-50%); }
+                }
+                .animate-float {
+                    animation-name: float;
+                    animation-timing-function: ease-in-out;
+                    animation-iteration-count: infinite;
+                }
+                .animate-wave {
+                    animation: wave 20s ease-in-out infinite;
+                }
+                .animate-wave-slow {
+                    animation: wave-slow 30s ease-in-out infinite;
+                }
+            `}</style>
+
             {/* Onboarding Tour - Different steps for admin vs user */}
             <Tour
                 steps={isAdmin ? BOARD_TOUR_STEPS_ADMIN : BOARD_TOUR_STEPS_USER}
                 storageKey={isAdmin ? 'crisp_board_admin_tour_completed' : 'crisp_board_user_tour_completed'}
             />
 
-            <div className="flex flex-col h-[calc(100vh-4rem)]">
+            <div className="relative z-10 flex flex-col h-[calc(100vh-4rem)]">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div className="flex items-center gap-4 flex-1">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
-                        >
-                            <ArrowLeft size={20} />
-                        </button>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-4 mb-6">
+                    {/* Top Row: Title & Main Info */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors flex-shrink-0"
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <input
                                     type="text"
                                     value={boardName}
                                     onChange={(e) => isAdmin && updateBoardName(e.target.value)}
                                     readOnly={!isAdmin}
-                                    className={`text-2xl font-bold text-gray-800 bg-transparent border border-transparent rounded px-1 -ml-1 outline-none w-full max-w-md transition-all ${isAdmin ? 'hover:border-gray-200 focus:border-blue-300' : 'cursor-default'}`}
+                                    className={`text-2xl font-bold text-gray-800 bg-transparent border border-transparent rounded px-1 -ml-1 outline-none truncate transition-all ${isAdmin ? 'hover:border-gray-200 focus:border-blue-300' : 'cursor-default'}`}
                                 />
-                                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${isFirebaseReady ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                                    {isFirebaseReady ? <Wifi size={12} /> : <WifiOff size={12} />}
-                                    <span>{isFirebaseReady ? 'Live' : 'Local Mode'}</span>
+
+                                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${isFirebaseReady ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                    {isFirebaseReady ? <Wifi size={10} /> : <WifiOff size={10} />}
+                                    <span className="hidden sm:inline">{isFirebaseReady ? 'Live' : 'Local'}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <span>Board ID:</span>
-                                <button
-                                    onClick={copyBoardId}
-                                    className="font-mono bg-gray-100 px-2 py-0.5 rounded hover:bg-gray-200 transition-colors flex items-center gap-1"
-                                    title="Click to copy ID"
-                                >
-                                    {boardId}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                        <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
-                        <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
-                        <Poll
-                            polls={polls}
-                            activePoll={activePoll}
-                            isAdmin={isAdmin}
-                            onCreatePoll={createPoll}
-                            onVotePoll={votePoll}
-                            onClosePoll={closePoll}
-                            onDeletePoll={deletePoll}
-                            currentUserId={localStorage.getItem('crisp_user_id')}
-                        />
-
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Search notes..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-full md:w-64"
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleShare}
-                            className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg border border-gray-200 transition-all shadow-sm hover:shadow-md"
-                        >
-                            <Share2 size={18} />
-                            <span className="hidden sm:inline font-medium">Invite</span>
-                        </button>
-
-                        {/* Export Dropdown Menu */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowExportMenu(!showExportMenu)}
-                                className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-lg transition-colors"
-                            >
-                                <Download size={18} />
-                                <span className="hidden sm:inline">Export</span>
-                                <ChevronDown size={16} />
-                            </button>
-                            {showExportMenu && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                                    <button
-                                        onClick={handleExportExcel}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>📊</span> Export as Excel
-                                    </button>
-                                    <button
-                                        onClick={handleExportCSV}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>📄</span> Export as CSV
-                                    </button>
-                                    <button
-                                        onClick={handleExportPDF}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>📑</span> Export as PDF
-                                    </button>
-                                    <button
-                                        onClick={handleExportJSON}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>🔧</span> Export as JSON
-                                    </button>
+                            {/* Online Users - Compact Stack with Count */}
+                            {onlineUsers.length > 0 && (
+                                <div className="flex items-center gap-2 flex-shrink-0 mx-2">
+                                    <div className="flex items-center -space-x-1.5 ">
+                                        {onlineUsers.slice(0, 4).map((user, index) => (
+                                            <div
+                                                key={user.id}
+                                                className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-sm ring-2 ring-transparent hover:scale-110 hover:z-10 transition-transform cursor-help"
+                                                title={user.name}
+                                                style={{ zIndex: 5 - index }}
+                                            >
+                                                {user.name.charAt(0).toUpperCase()}
+                                            </div>
+                                        ))}
+                                        {onlineUsers.length > 4 && (
+                                            <div className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-500 text-[10px] font-bold shadow-sm z-0">
+                                                +{onlineUsers.length - 4}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span className="text-xs font-medium text-gray-500 hidden md:inline">
+                                        {onlineUsers.length} online
+                                    </span>
                                 </div>
                             )}
+                        </div>
+
+                    </div>
+
+                    {/* Unified Toolbar - Visible to ALL Users */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/60 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
+                        {/* Session Controls Group (Timer, Music, Poll) */}
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
+                            <div className="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200/50">
+                                <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
+                                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                                <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
+                            </div>
+
+                        </div>
+
+                        {/* Utilities Group (Search, Invite, Export) */}
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <div className="relative flex-1 sm:flex-none">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9 pr-3 h-[46px] bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-full sm:w-48 transition-all shadow-sm"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleShare}
+                                    className="flex items-center gap-2 h-[46px] bg-white hover:bg-gray-50 text-gray-700 px-3 rounded-xl border border-gray-200 transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
+                                >
+                                    <Share2 size={16} />
+                                    <span className="hidden sm:inline">Invite</span>
+                                </button>
+
+                                <Poll
+                                    polls={polls}
+                                    activePoll={activePoll}
+                                    isAdmin={isAdmin}
+                                    onCreatePoll={createPoll}
+                                    onVotePoll={votePoll}
+                                    onClosePoll={closePoll}
+                                    onDeletePoll={deletePoll}
+                                    currentUserId={localStorage.getItem('crisp_user_id')}
+                                />
+
+                                {/* Export - Admin Only */}
+                                {isAdmin && (
+                                    <div className="relative" ref={exportMenuRef}>
+                                        <button
+                                            onClick={() => setShowExportMenu(!showExportMenu)}
+                                            className="flex items-center gap-2 h-[46px] bg-gray-900 hover:bg-black text-white px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
+                                        >
+                                            <Download size={16} />
+                                            <span className="hidden lg:inline">Export</span>
+                                            <ChevronDown size={14} />
+                                        </button>
+                                        {showExportMenu && (
+                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                                <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Export As</div>
+                                                <button onClick={handleExportExcel} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                    <span>📊</span> Excel
+                                                </button>
+                                                <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                    <span>📄</span> CSV
+                                                </button>
+                                                <button onClick={handleExportPDF} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                    <span>📑</span> PDF
+                                                </button>
+                                                <button onClick={handleExportJSON} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                    <span>🔧</span> JSON
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Clear Board - Admin Only */}
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm("Are you sure you want to clear all notes from the board? This action cannot be undone.")) {
+                                                clearAllNotes();
+                                                toast.success("Board cleared successfully");
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 h-[46px] bg-red-50 hover:bg-red-100 text-red-600 px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap border border-red-100"
+                                        title="Clear all notes"
+                                    >
+                                        <Trash2 size={16} />
+                                        <span className="hidden lg:inline">Clear Board</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -445,7 +589,11 @@ const BoardPage = () => {
                         {sortedColumns.map(column => (
                             <div
                                 key={column.id}
-                                className={sortedColumns.length <= 4 ? 'flex-1 min-w-[250px]' : 'flex-shrink-0 w-80'}
+                                className={
+                                    isAdmin
+                                        ? (sortedColumns.length <= 3 ? 'flex-1 min-w-[250px]' : 'flex-shrink-0 w-72')
+                                        : (sortedColumns.length <= 4 ? 'flex-1 min-w-[250px]' : 'flex-shrink-0 w-80')
+                                }
                             >
                                 <Column
                                     column={column}

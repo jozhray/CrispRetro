@@ -334,15 +334,25 @@ export const BOARD_TOUR_STEPS_ADMIN = [
         icon: '⏱️'
     },
     {
+        title: 'Quick Polls',
+        description: 'Create polls to gather team opinions quickly! Results are shown in real-time.',
+        icon: '📊'
+    },
+    {
         title: 'Add & Vote',
         description: 'Click + to add notes. Everyone can vote 👍 on ideas!',
-        icon: '📊'
+        icon: '✨'
     },
     {
         title: 'Invite Team',
         description: 'Share the board link to invite your teammates!',
         icon: '📤',
         target: 'button:has(.lucide-share2)'
+    },
+    {
+        title: 'Export Board',
+        description: 'Download your retro as Excel, CSV, PDF or JSON!',
+        icon: '💾'
     }
 ];
 
@@ -354,14 +364,24 @@ export const BOARD_TOUR_STEPS_USER = [
         icon: '🙌'
     },
     {
+        title: 'See Your Team',
+        description: 'Look for the avatars at the top - see who else is online in real-time!',
+        icon: '👥'
+    },
+    {
         title: 'Add Notes',
         description: 'Click + in any column to share your thoughts.',
         icon: '📝'
     },
     {
         title: 'Vote',
-        description: 'Click 👍 to vote on notes. Top voted rise up!',
+        description: 'Click 👍 to vote on notes you agree with!',
         icon: '🗳️'
+    },
+    {
+        title: 'Join Polls',
+        description: 'Vote on polls created by your admin. Results show in real-time!',
+        icon: '📊'
     },
     {
         title: 'Volume',

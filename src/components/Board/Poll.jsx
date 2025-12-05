@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BarChart3, Plus, X, Check, Trash2, Users, Lock, Minus, Maximize2, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -77,7 +78,7 @@ const Poll = ({
             {isAdmin && (
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+                    className="flex items-center gap-2 h-[46px] px-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl font-medium transition-all shadow-md hover:shadow-lg"
                 >
                     <BarChart3 size={18} />
                     <span className="hidden sm:inline">Create Poll</span>
@@ -169,8 +170,8 @@ const Poll = ({
                                                     key={option.id}
                                                     onClick={() => onVotePoll(activePoll.id, option.id)}
                                                     className={`w-full relative overflow-hidden rounded-xl border-2 transition-all ${isSelected
-                                                            ? 'border-indigo-500 bg-indigo-50'
-                                                            : 'border-gray-200 hover:border-indigo-300 bg-white'
+                                                        ? 'border-indigo-500 bg-indigo-50'
+                                                        : 'border-gray-200 hover:border-indigo-300 bg-white'
                                                         }`}
                                                 >
                                                     {/* Progress bar background */}
@@ -223,113 +224,116 @@ const Poll = ({
             </AnimatePresence>
 
             {/* Create Poll Modal */}
-            <AnimatePresence>
-                {showCreateModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
-                        onClick={() => setShowCreateModal(false)}
-                    >
+            {createPortal(
+                <AnimatePresence>
+                    {showCreateModal && (
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
-                            onClick={e => e.stopPropagation()}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100]"
+                            onClick={() => setShowCreateModal(false)}
                         >
-                            {/* Modal Header */}
-                            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <BarChart3 size={20} />
-                                        <h3 className="font-bold text-lg">Create Poll</h3>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {/* Modal Header */}
+                                <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <BarChart3 size={20} />
+                                            <h3 className="font-bold text-lg">Create Poll</h3>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowCreateModal(false)}
+                                            className="p-1 hover:bg-white/20 rounded transition-colors"
+                                        >
+                                            <X size={20} />
+                                        </button>
                                     </div>
+                                </div>
+
+                                {/* Modal Content */}
+                                <div className="p-4 space-y-4">
+                                    {/* Question */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Question
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={question}
+                                            onChange={(e) => setQuestion(e.target.value)}
+                                            placeholder="What should we discuss first?"
+                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            autoFocus
+                                        />
+                                    </div>
+
+                                    {/* Options */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Options
+                                        </label>
+                                        <div className="space-y-2">
+                                            {options.map((option, index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={option}
+                                                        onChange={(e) => handleOptionChange(index, e.target.value)}
+                                                        placeholder={`Option ${index + 1}`}
+                                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                                    />
+                                                    {options.length > 2 && (
+                                                        <button
+                                                            onClick={() => handleRemoveOption(index)}
+                                                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                        >
+                                                            <X size={18} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {options.length < 6 && (
+                                            <button
+                                                onClick={handleAddOption}
+                                                className="mt-2 flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                                            >
+                                                <Plus size={16} />
+                                                Add Option
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Modal Footer */}
+                                <div className="p-4 bg-gray-50 flex gap-3">
                                     <button
                                         onClick={() => setShowCreateModal(false)}
-                                        className="p-1 hover:bg-white/20 rounded transition-colors"
+                                        className="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
                                     >
-                                        <X size={20} />
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleCreatePoll}
+                                        disabled={!question.trim() || options.filter(o => o.trim()).length < 2}
+                                        className="flex-1 py-2 px-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-300 text-white rounded-lg font-medium transition-all disabled:cursor-not-allowed"
+                                    >
+                                        Create Poll
                                     </button>
                                 </div>
-                            </div>
-
-                            {/* Modal Content */}
-                            <div className="p-4 space-y-4">
-                                {/* Question */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Question
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={question}
-                                        onChange={(e) => setQuestion(e.target.value)}
-                                        placeholder="What should we discuss first?"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                        autoFocus
-                                    />
-                                </div>
-
-                                {/* Options */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Options
-                                    </label>
-                                    <div className="space-y-2">
-                                        {options.map((option, index) => (
-                                            <div key={index} className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={option}
-                                                    onChange={(e) => handleOptionChange(index, e.target.value)}
-                                                    placeholder={`Option ${index + 1}`}
-                                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                                />
-                                                {options.length > 2 && (
-                                                    <button
-                                                        onClick={() => handleRemoveOption(index)}
-                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                    >
-                                                        <X size={18} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {options.length < 6 && (
-                                        <button
-                                            onClick={handleAddOption}
-                                            className="mt-2 flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                                        >
-                                            <Plus size={16} />
-                                            Add Option
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Modal Footer */}
-                            <div className="p-4 bg-gray-50 flex gap-3">
-                                <button
-                                    onClick={() => setShowCreateModal(false)}
-                                    className="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleCreatePoll}
-                                    disabled={!question.trim() || options.filter(o => o.trim()).length < 2}
-                                    className="flex-1 py-2 px-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-300 text-white rounded-lg font-medium transition-all disabled:cursor-not-allowed"
-                                >
-                                    Create Poll
-                                </button>
-                            </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 };

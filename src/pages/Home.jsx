@@ -230,32 +230,37 @@ const Home = () => {
                                         />
                                     </div>
 
-                                    {/* Board Name Input */}
+                                    {/* Board Name Input - disabled when joining */}
                                     <div>
                                         <label className="block text-sm font-medium text-purple-300 mb-2">
-                                            Board Name
+                                            Board Name {boardId && <span className="text-gray-500 text-xs">(joining existing board)</span>}
                                         </label>
                                         <input
                                             type="text"
                                             value={boardName}
                                             onChange={(e) => setBoardName(e.target.value)}
-                                            placeholder="Sprint 42 Retro"
-                                            className="w-full px-4 py-3 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
+                                            placeholder={boardId ? "Not needed when joining" : "Sprint 42 Retro"}
+                                            disabled={!!boardId}
+                                            className={`w-full px-4 py-3 bg-slate-800/50 border rounded-lg text-white placeholder-gray-500 outline-none transition-all backdrop-blur-sm ${boardId
+                                                ? 'border-gray-600 cursor-not-allowed opacity-50'
+                                                : 'border-purple-500/30 focus:ring-2 focus:ring-purple-400 focus:border-transparent'
+                                                }`}
                                         />
                                     </div>
 
-                                    {/* Create Button */}
+                                    {/* Create Button - disabled when joining */}
                                     <button
                                         type="button"
-                                        onClick={handleCreateBoard}
-                                        className="w-full relative group/btn overflow-hidden rounded-xl"
+                                        onClick={!boardId ? handleCreateBoard : undefined}
+                                        disabled={!!boardId}
+                                        className={`w-full relative group/btn overflow-hidden rounded-xl ${boardId ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 opacity-100 group-hover/btn:opacity-90 transition-opacity"></div>
+                                        <div className={`absolute inset-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 ${boardId ? 'opacity-50' : 'opacity-100 group-hover/btn:opacity-90'} transition-opacity`}></div>
                                         <div className="relative flex items-center justify-center gap-2 py-4 px-6 font-semibold text-white">
                                             <Plus size={20} />
-                                            <span>Create New Board</span>
+                                            <span>{boardId ? 'Use Join Button Below' : 'Create New Board'}</span>
                                         </div>
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover/btn:translate-x-[200%] transition-transform duration-1000"></div>
+                                        {!boardId && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover/btn:translate-x-[200%] transition-transform duration-1000"></div>}
                                     </button>
 
                                     {/* Divider */}
@@ -291,11 +296,12 @@ const Home = () => {
                         </div>
 
                         {/* Features Grid */}
-                        <div className="grid grid-cols-3 gap-4 mt-8">
+                        <div className="grid grid-cols-4 gap-4 mt-8">
                             {[
                                 { icon: '⏱️', label: 'Timer' },
                                 { icon: '🎵', label: 'Music' },
-                                { icon: '📊', label: 'Export' }
+                                { icon: '📊', label: 'Poll' },
+                                { icon: '📥', label: 'Export' }
                             ].map((feature, i) => (
                                 <div
                                     key={i}

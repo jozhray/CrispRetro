@@ -166,12 +166,26 @@ const Column = ({
                 </div>
             )}
 
-            <button
-                onClick={() => onAddNote(column.id)}
-                className="w-full py-2.5 mb-4 bg-white/60 hover:bg-white text-gray-600 hover:text-blue-600 rounded-xl border border-transparent hover:border-blue-100 transition-all flex items-center justify-center gap-2 font-medium text-sm shadow-sm"
-            >
-                <Plus size={16} />
-            </button>
+            {/* Add Note Button - disabled if current user has an empty note */}
+            {(() => {
+                const hasMyEmptyNote = notes.some(note =>
+                    note.authorId === currentUserId &&
+                    (!note.content || note.content.trim() === '')
+                );
+                return (
+                    <button
+                        onClick={() => !hasMyEmptyNote && onAddNote(column.id)}
+                        disabled={hasMyEmptyNote}
+                        className={`w-full py-2.5 mb-4 rounded-xl border transition-all flex items-center justify-center gap-2 font-medium text-sm shadow-sm ${hasMyEmptyNote
+                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                            : 'bg-white/60 hover:bg-white text-gray-600 hover:text-blue-600 border-transparent hover:border-blue-100'
+                            }`}
+                        title={hasMyEmptyNote ? 'Please fill in your empty note first' : 'Add a new note'}
+                    >
+                        <Plus size={16} />
+                    </button>
+                );
+            })()}
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
                 {/* Drop zone indicator when dragging */}
