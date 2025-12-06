@@ -11,7 +11,9 @@ const Poll = ({
     onVotePoll,
     onClosePoll,
     onDeletePoll,
-    currentUserId
+    currentUserId,
+    showControls = true,
+    showActivePoll = true
 }) => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [question, setQuestion] = useState('');
@@ -75,7 +77,7 @@ const Poll = ({
     return (
         <div className="relative">
             {/* Create Poll Button - Admin Only */}
-            {isAdmin && (
+            {showControls && isAdmin && (
                 <button
                     onClick={() => setShowCreateModal(true)}
                     className="flex items-center gap-2 h-[46px] px-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl font-medium transition-all shadow-md hover:shadow-lg"
@@ -85,146 +87,149 @@ const Poll = ({
                 </button>
             )}
 
-            {/* Active Poll Display - Draggable */}
-            <AnimatePresence>
-                {activePoll && (
-                    <motion.div
-                        drag
-                        dragMomentum={false}
-                        dragElastic={0}
-                        initial={{ opacity: 0, y: -10, x: 0 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        style={{ position: 'fixed', top: 80, right: 16 }}
-                        className={`bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 ${isMinimized ? 'w-auto' : 'w-80'}`}
-                    >
-                        {/* Poll Header - Drag Handle */}
-                        <div
-                            className="bg-gradient-to-r from-indigo-500 to-purple-500 p-3 text-white cursor-grab active:cursor-grabbing"
+            {/* Active Poll Display - Draggable (Portaled to break stacking contexts) */}
+            {showActivePoll && createPortal(
+                <AnimatePresence>
+                    {activePoll && (
+                        <motion.div
+                            drag
+                            dragMomentum={false}
+                            dragElastic={0}
+                            initial={{ opacity: 0, y: -10, x: 0 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            style={{ position: 'fixed', top: 80, right: 16 }}
+                            className={`bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[70] ${isMinimized ? 'w-auto' : 'w-80'}`}
                         >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <GripVertical size={16} className="opacity-60" />
-                                    <BarChart3 size={18} />
-                                    <span className="text-sm font-medium opacity-90">Live Poll</span>
-                                    {isMinimized && (
-                                        <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                                            {getTotalVotes(activePoll)} votes
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    {/* Minimize/Expand button */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}
-                                        className="p-1.5 hover:bg-white/20 rounded transition-colors"
-                                        title={isMinimized ? "Expand Poll" : "Minimize Poll"}
-                                    >
-                                        {isMinimized ? <Maximize2 size={14} /> : <Minus size={14} />}
-                                    </button>
-                                    {isAdmin && (
-                                        <>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onClosePoll(activePoll.id); }}
-                                                className="p-1.5 hover:bg-white/20 rounded transition-colors"
-                                                title="Close Poll"
-                                            >
-                                                <Lock size={14} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onDeletePoll(activePoll.id); }}
-                                                className="p-1.5 hover:bg-white/20 rounded transition-colors"
-                                                title="Delete Poll"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                            {!isMinimized && (
-                                <h3 className="font-bold mt-2">{activePoll.question}</h3>
-                            )}
-                        </div>
-
-                        {/* Poll Content - Hidden when minimized */}
-                        <AnimatePresence>
-                            {!isMinimized && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    {/* Poll Options */}
-                                    <div className="p-4 space-y-2">
-                                        {getPollOptions(activePoll).map((option) => {
-                                            const totalVotes = getTotalVotes(activePoll);
-                                            const voteCount = option?.votes?.length || 0;
-                                            const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
-                                            const userVoted = getUserVote(activePoll);
-                                            const isSelected = userVoted === option.id;
-
-                                            return (
-                                                <button
-                                                    key={option.id}
-                                                    onClick={() => onVotePoll(activePoll.id, option.id)}
-                                                    className={`w-full relative overflow-hidden rounded-xl border-2 transition-all ${isSelected
-                                                        ? 'border-indigo-500 bg-indigo-50'
-                                                        : 'border-gray-200 hover:border-indigo-300 bg-white'
-                                                        }`}
-                                                >
-                                                    {/* Progress bar background */}
-                                                    <motion.div
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: `${percentage}%` }}
-                                                        transition={{ duration: 0.5 }}
-                                                        className={`absolute inset-0 ${isSelected ? 'bg-indigo-200' : 'bg-gray-100'}`}
-                                                    />
-
-                                                    {/* Content */}
-                                                    <div className="relative flex items-center justify-between p-3">
-                                                        <div className="flex items-center gap-2">
-                                                            {isSelected && (
-                                                                <Check size={16} className="text-indigo-600" />
-                                                            )}
-                                                            <span className={`font-medium ${isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>
-                                                                {option.text}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`text-sm font-semibold ${isSelected ? 'text-indigo-600' : 'text-gray-500'}`}>
-                                                                {Math.round(percentage)}%
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                ({voteCount})
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Poll Footer */}
-                                    <div className="px-4 pb-4 flex items-center justify-between text-sm text-gray-500">
-                                        <div className="flex items-center gap-1">
-                                            <Users size={14} />
-                                            <span>{getTotalVotes(activePoll)} votes</span>
-                                        </div>
-                                        {getUserVote(activePoll) !== null && (
-                                            <span className="text-indigo-600 font-medium">✓ You voted</span>
+                            {/* Poll Header - Drag Handle */}
+                            <div
+                                className="bg-gradient-to-r from-indigo-500 to-purple-500 p-3 text-white cursor-grab active:cursor-grabbing"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <GripVertical size={16} className="opacity-60" />
+                                        <BarChart3 size={18} />
+                                        <span className="text-sm font-medium opacity-90">Live Poll</span>
+                                        {isMinimized && (
+                                            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                                {getTotalVotes(activePoll)} votes
+                                            </span>
                                         )}
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                                    <div className="flex items-center gap-1">
+                                        {/* Minimize/Expand button */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}
+                                            className="p-1.5 hover:bg-white/20 rounded transition-colors"
+                                            title={isMinimized ? "Expand Poll" : "Minimize Poll"}
+                                        >
+                                            {isMinimized ? <Maximize2 size={14} /> : <Minus size={14} />}
+                                        </button>
+                                        {isAdmin && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onClosePoll(activePoll.id); }}
+                                                    className="p-1.5 hover:bg-white/20 rounded transition-colors"
+                                                    title="Close Poll"
+                                                >
+                                                    <Lock size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onDeletePoll(activePoll.id); }}
+                                                    className="p-1.5 hover:bg-white/20 rounded transition-colors"
+                                                    title="Delete Poll"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                {!isMinimized && (
+                                    <h3 className="font-bold mt-2">{activePoll.question}</h3>
+                                )}
+                            </div>
+
+                            {/* Poll Content - Hidden when minimized */}
+                            <AnimatePresence>
+                                {!isMinimized && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        {/* Poll Options */}
+                                        <div className="p-4 space-y-2">
+                                            {getPollOptions(activePoll).map((option) => {
+                                                const totalVotes = getTotalVotes(activePoll);
+                                                const voteCount = option?.votes?.length || 0;
+                                                const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                                                const userVoted = getUserVote(activePoll);
+                                                const isSelected = userVoted === option.id;
+
+                                                return (
+                                                    <button
+                                                        key={option.id}
+                                                        onClick={() => onVotePoll(activePoll.id, option.id)}
+                                                        className={`w-full relative overflow-hidden rounded-xl border-2 transition-all ${isSelected
+                                                            ? 'border-indigo-500 bg-indigo-50'
+                                                            : 'border-gray-200 hover:border-indigo-300 bg-white'
+                                                            }`}
+                                                    >
+                                                        {/* Progress bar background */}
+                                                        <motion.div
+                                                            initial={{ width: 0 }}
+                                                            animate={{ width: `${percentage}%` }}
+                                                            transition={{ duration: 0.5 }}
+                                                            className={`absolute inset-0 ${isSelected ? 'bg-indigo-200' : 'bg-gray-100'}`}
+                                                        />
+
+                                                        {/* Content */}
+                                                        <div className="relative flex items-center justify-between p-3">
+                                                            <div className="flex items-center gap-2">
+                                                                {isSelected && (
+                                                                    <Check size={16} className="text-indigo-600" />
+                                                                )}
+                                                                <span className={`font-medium ${isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>
+                                                                    {option.text}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-sm font-semibold ${isSelected ? 'text-indigo-600' : 'text-gray-500'}`}>
+                                                                    {Math.round(percentage)}%
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    ({voteCount})
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Poll Footer */}
+                                        <div className="px-4 pb-4 flex items-center justify-between text-sm text-gray-500">
+                                            <div className="flex items-center gap-1">
+                                                <Users size={14} />
+                                                <span>{getTotalVotes(activePoll)} votes</span>
+                                            </div>
+                                            {getUserVote(activePoll) !== null && (
+                                                <span className="text-indigo-600 font-medium">✓ You voted</span>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </motion.div>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
 
             {/* Create Poll Modal */}
-            {createPortal(
+            {showControls && createPortal(
                 <AnimatePresence>
                     {showCreateModal && (
                         <motion.div

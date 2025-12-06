@@ -16,9 +16,16 @@ const TRACKS = [
     { name: 'Action Items', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' }
 ];
 
-const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
-    const audioRef = useRef(new Audio(TRACKS[0].url));
-    const [volume, setVolume] = useState(0.5);
+const MusicPlayer = ({
+    music,
+    isAdmin,
+    onUpdateMusic,
+    volume,
+    onVolumeChange,
+    audioBlocked,
+    onResumeAudio
+}) => {
+    // const audioRef = useRef(new Audio(TRACKS[0].url)); // Moved to AudioManager
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const volumeRef = useRef(null);
 
@@ -35,52 +42,30 @@ const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
         }
     }, [showVolumeSlider]);
 
-    useEffect(() => {
-        audioRef.current.loop = true;
-        audioRef.current.volume = volume;
-        return () => {
-            audioRef.current.pause();
-        };
-    }, []);
-
-    // Handle volume changes
-    useEffect(() => {
-        audioRef.current.volume = volume;
-    }, [volume]);
-
-    // Handle Track Changes
-    useEffect(() => {
-        if (music.currentTrack && music.currentTrack !== audioRef.current.src) {
-            const wasPlaying = !audioRef.current.paused;
-            audioRef.current.src = music.currentTrack;
-            if (wasPlaying || music.isPlaying) {
-                audioRef.current.play().catch(e => console.log("Audio play failed:", e));
-            }
-        }
-    }, [music.currentTrack]);
-
-    // Handle Play/Pause
-    useEffect(() => {
-        if (music.isPlaying) {
-            audioRef.current.play().catch(e => console.log("Audio play failed (likely autoplay policy):", e));
-        } else {
-            audioRef.current.pause();
-        }
-    }, [music.isPlaying]);
-
     const togglePlay = () => {
         if (!isAdmin) return;
+        onResumeAudio?.();
         onUpdateMusic({ ...music, isPlaying: !music.isPlaying });
     };
 
     const handleTrackChange = (e) => {
         if (!isAdmin) return;
+        onResumeAudio?.();
         onUpdateMusic({ ...music, currentTrack: e.target.value, isPlaying: true });
     };
 
     return (
-        <div className="flex items-center gap-3 bg-gradient-to-r from-purple-900 to-indigo-900 px-4 py-2 rounded-xl shadow-lg h-[46px]">
-            <Music size={16} className={music.isPlaying ? "text-purple-300 animate-pulse" : "text-purple-400"} />
+        <div className="relative flex items-center gap-3 bg-gradient-to-r from-purple-900 to-indigo-900 px-4 py-2 rounded-xl shadow-lg h-[46px]">
+            {audioBlocked && music.isPlaying && (
+                <div
+                    onClick={onResumeAudio}
+                    className="absolute -top-12 left-1/2 -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg cursor-pointer animate-bounce whitespace-nowrap z-50"
+                >
+                    Tap to Unmute 🔇
+                </div>
+            )}
+
+            <Music size={16} className={music.isPlaying && !audioBlocked ? "text-purple-300 animate-pulse" : "text-purple-400"} />
 
             {isAdmin ? (
                 <div className="flex items-center gap-2">
@@ -136,12 +121,17 @@ const MusicPlayer = ({ music, isAdmin, onUpdateMusic }) => {
                                 max="1"
                                 step="0.1"
                                 value={volume}
-                                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                                onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
                                 className="absolute inset-0 w-full opacity-0 cursor-pointer"
                             />
                         </div>
                         <div className="flex justify-between text-[10px] text-purple-400 mt-1">
-                            <span>Mute</span>
+                            <span
+                                onClick={() => onVolumeChange(0)}
+                                className="cursor-pointer hover:text-purple-200 active:scale-95 transition-all font-semibold"
+                            >
+                                Mute
+                            </span>
                             <span>{Math.round(volume * 100)}%</span>
                         </div>
                     </div>

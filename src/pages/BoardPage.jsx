@@ -14,6 +14,8 @@ import Tour, { BOARD_TOUR_STEPS_ADMIN, BOARD_TOUR_STEPS_USER } from '../componen
 import { useToast } from '../components/Toast';
 import { useBoard, COLUMN_COLORS } from '../store/useBoard';
 
+import BoardAudioManager from '../components/Board/BoardAudioManager';
+
 const BoardPage = () => {
     const { boardId } = useParams();
     const navigate = useNavigate();
@@ -29,6 +31,23 @@ const BoardPage = () => {
     const userListRef = useRef(null);
     const currentUser = localStorage.getItem('crisp_user_name') || 'Anonymous';
     const toast = useToast();
+
+    // Global Audio State
+    const [musicVolume, setMusicVolume] = useState(() => parseFloat(localStorage.getItem('crisp_music_vol') || '0.5'));
+    const [timerVolume, setTimerVolume] = useState(() => parseFloat(localStorage.getItem('crisp_timer_vol') || '0.5'));
+    const [audioBlocked, setAudioBlocked] = useState(false);
+    const audioManagerRef = useRef(null);
+
+    // Persist Volumes
+    useEffect(() => { localStorage.setItem('crisp_music_vol', musicVolume); }, [musicVolume]);
+    useEffect(() => { localStorage.setItem('crisp_timer_vol', timerVolume); }, [timerVolume]);
+
+    // Resume Audio Handler
+    const handleResumeAudio = () => {
+        if (audioManagerRef.current) {
+            audioManagerRef.current.resumeAudio();
+        }
+    };
 
     const {
         columns,
@@ -66,14 +85,29 @@ const BoardPage = () => {
     } = useBoard(boardId);
 
     // Mobile Column Selection State
-    const [selectedMobileColumnId, setSelectedMobileColumnId] = useState(null);
+    const [selectedMobileColumnId, setSelectedMobileColumnId] = useState(() => {
+        return localStorage.getItem(`crisp_mobile_col_${boardId}`) || null;
+    });
 
     // Initialize selected mobile column once columns are loaded
     useEffect(() => {
-        if (!selectedMobileColumnId && sortedColumns.length > 0) {
-            setSelectedMobileColumnId(sortedColumns[0].id);
+        if (sortedColumns.length > 0) {
+            // If we have a selected column, verify it still exists
+            const isValidSelection = selectedMobileColumnId && sortedColumns.some(c => c.id === selectedMobileColumnId);
+
+            if (!isValidSelection) {
+                // Default to first column if no selection or invalid
+                setSelectedMobileColumnId(sortedColumns[0].id);
+            }
         }
     }, [sortedColumns, selectedMobileColumnId]);
+
+    // Persist selection
+    useEffect(() => {
+        if (selectedMobileColumnId) {
+            localStorage.setItem(`crisp_mobile_col_${boardId}`, selectedMobileColumnId);
+        }
+    }, [selectedMobileColumnId, boardId]);
 
     // Redirect if no user name found
     React.useEffect(() => {
@@ -385,6 +419,31 @@ const BoardPage = () => {
 
     return (
         <Layout>
+            {/* Global Poll Display (Single Instance) */}
+            <Poll
+                polls={polls}
+                activePoll={activePoll}
+                isAdmin={isAdmin}
+                onCreatePoll={createPoll}
+                onVotePoll={votePoll}
+                onClosePoll={closePoll}
+                onDeletePoll={deletePoll}
+                currentUserId={localStorage.getItem('crisp_user_id')}
+                showControls={false}
+            />
+
+            <BoardAudioManager
+                ref={audioManagerRef}
+                music={music}
+                timer={timer}
+                musicVolume={musicVolume}
+                timerVolume={timerVolume}
+                onUpdateTimer={updateTimer}
+                onUpdateMusic={updateMusic}
+                onAudioBlocked={setAudioBlocked}
+                isAdmin={isAdmin}
+            />
+
             {/* Animated Background - Pleasant Bubbles */}
             <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-200 via-blue-100 to-indigo-200">
                 {/* Floating Crisp Bubbles */}
@@ -465,122 +524,148 @@ const BoardPage = () => {
                         <div className={`w-2 h-2 rounded-full ${isFirebaseReady ? 'bg-green-500' : 'bg-orange-500'} shadow-sm`} title={isFirebaseReady ? "Live" : "Local Mode"}></div>
                     </div>
 
-                    <button
-                        onClick={() => setShowMobileMenu(true)}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
-                    >
-                        <Menu size={24} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <Poll
+                            polls={polls}
+                            activePoll={activePoll}
+                            isAdmin={isAdmin}
+                            onCreatePoll={createPoll}
+                            onVotePoll={votePoll}
+                            onClosePoll={closePoll}
+                            onDeletePoll={deletePoll}
+                            currentUserId={localStorage.getItem('crisp_user_id')}
+                            showActivePoll={false}
+                        />
+                        <button
+                            onClick={() => setShowMobileMenu(true)}
+                            className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                        >
+                            <Menu size={24} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* === MOBILE MENU OVERLAY === */}
-                {showMobileMenu && (
-                    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm md:hidden" onClick={() => setShowMobileMenu(false)}>
-                        <div className="absolute right-0 top-0 bottom-0 w-3/4 max-w-xs bg-white shadow-2xl p-4 flex flex-col gap-6" onClick={e => e.stopPropagation()}>
-                            <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-                                <h2 className="font-bold text-gray-800 text-lg">Board Menu</h2>
-                                <button onClick={() => setShowMobileMenu(false)} className="p-1 text-gray-500 hover:bg-gray-100 rounded-full"><X size={24} /></button>
+                <div
+                    className={`fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm md:hidden transition-opacity duration-300 ${showMobileMenu ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                        }`}
+                    onClick={() => setShowMobileMenu(false)}
+                >
+                    <div
+                        className={`absolute right-0 top-0 bottom-0 w-3/4 max-w-xs bg-white shadow-2xl p-4 flex flex-col gap-6 transition-transform duration-300 ${showMobileMenu ? 'translate-x-0' : 'translate-x-full'
+                            }`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                            <h2 className="font-bold text-gray-800 text-lg">Board Menu</h2>
+                            <button onClick={() => setShowMobileMenu(false)} className="p-1 text-gray-500 hover:bg-gray-100 rounded-full"><X size={24} /></button>
+                        </div>
+
+                        <div className="flex flex-col gap-4 overflow-y-auto">
+                            {/* Session Controls */}
+                            <div className="space-y-3">
+                                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Session Controls</div>
+                                <div className="flex flex-col gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <Timer
+                                        timer={timer}
+                                        isAdmin={isAdmin}
+                                        onUpdateTimer={updateTimer}
+                                        volume={timerVolume}
+                                        onVolumeChange={setTimerVolume}
+                                        audioBlocked={audioBlocked}
+                                        onResumeAudio={handleResumeAudio}
+                                    />
+                                    <div className="h-px bg-gray-200"></div>
+                                    <MusicPlayer
+                                        music={music}
+                                        isAdmin={isAdmin}
+                                        onUpdateMusic={updateMusic}
+                                        volume={musicVolume}
+                                        onVolumeChange={setMusicVolume}
+                                        audioBlocked={audioBlocked}
+                                        onResumeAudio={handleResumeAudio}
+                                    />
+
+                                </div>
                             </div>
 
-                            <div className="flex flex-col gap-4 overflow-y-auto">
-                                {/* Session Controls */}
-                                <div className="space-y-3">
-                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Session Controls</div>
-                                    <div className="flex flex-col gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                                        <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
-                                        <div className="h-px bg-gray-200"></div>
-                                        <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
-                                        <div className="h-px bg-gray-200"></div>
-                                        <Poll
-                                            polls={polls}
-                                            activePoll={activePoll}
-                                            isAdmin={isAdmin}
-                                            onCreatePoll={createPoll}
-                                            onVotePoll={votePoll}
-                                            onClosePoll={closePoll}
-                                            onDeletePoll={deletePoll}
-                                            currentUserId={localStorage.getItem('crisp_user_id')}
-                                        />
-                                    </div>
+                            {/* Utilities */}
+                            <div className="space-y-3">
+                                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tools</div>
+                                <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                                    <Search size={16} className="text-gray-400 mr-2" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search notes..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="bg-transparent outline-none flex-1 text-sm"
+                                    />
                                 </div>
-
-                                {/* Utilities */}
-                                <div className="space-y-3">
-                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tools</div>
-                                    <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-                                        <Search size={16} className="text-gray-400 mr-2" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search notes..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="bg-transparent outline-none flex-1 text-sm"
-                                        />
-                                    </div>
-                                    <button onClick={handleShare} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors text-left text-gray-700">
-                                        <Share2 size={18} />
-                                        <span>Invite Others</span>
-                                    </button>
-                                    <div className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
-                                        <button
-                                            onClick={() => setShowUserList(!showUserList)}
-                                            className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors text-left text-gray-700"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <Users size={18} />
-                                                <span>Active Users ({onlineUsers.length})</span>
-                                            </div>
-                                            <ChevronDown size={16} className={`transition-transform ${showUserList ? 'rotate-180' : ''}`} />
-                                        </button>
-
-                                        {showUserList && (
-                                            <div className="px-3 pb-3 pt-0 bg-gray-50 max-h-40 overflow-y-auto">
-                                                <div className="h-px bg-gray-200 mb-2"></div>
-                                                {onlineUsers.length === 0 ? (
-                                                    <p className="text-sm text-gray-400 italic">No one else is here...</p>
-                                                ) : (
-                                                    <div className="space-y-2">
-                                                        {onlineUsers.map(user => (
-                                                            <div key={user.id} className="flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
-                                                                    {user.name.charAt(0).toUpperCase()}
-                                                                </div>
-                                                                <span className="text-sm text-gray-600 truncate">{user.name}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Admin Actions */}
-                                {isAdmin && (
-                                    <div className="space-y-3">
-                                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</div>
-                                        <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-                                            <button onClick={handleExportExcel} className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 text-left text-gray-700 transition-colors border-b border-gray-100">
-                                                <span>📊</span> Export Excel
-                                            </button>
-                                            <button onClick={handleExportPDF} className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 text-left text-gray-700 transition-colors border-b border-gray-100">
-                                                <span>📑</span> Export PDF
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    if (window.confirm("Are you sure you want to clear all notes?")) clearAllNotes();
-                                                }}
-                                                className="w-full flex items-center gap-3 p-3 hover:bg-red-50 text-left text-red-600 transition-colors"
-                                            >
-                                                <Trash2 size={18} /> Clear Board
-                                            </button>
+                                <button onClick={handleShare} className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl transition-colors text-left text-gray-700">
+                                    <Share2 size={18} />
+                                    <span>Invite Others</span>
+                                </button>
+                                <div className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
+                                    <button
+                                        onClick={() => setShowUserList(!showUserList)}
+                                        className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition-colors text-left text-gray-700"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Users size={18} />
+                                            <span>Active Users ({onlineUsers.length})</span>
                                         </div>
-                                    </div>
-                                )}
+                                        <ChevronDown size={16} className={`transition-transform ${showUserList ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {showUserList && (
+                                        <div className="px-3 pb-3 pt-0 bg-gray-50 max-h-40 overflow-y-auto">
+                                            <div className="h-px bg-gray-200 mb-2"></div>
+                                            {onlineUsers.length === 0 ? (
+                                                <p className="text-sm text-gray-400 italic">No one else is here...</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {onlineUsers.map(user => (
+                                                        <div key={user.id} className="flex items-center gap-2">
+                                                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
+                                                                {user.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span className="text-sm text-gray-600 truncate">{user.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
+
+                            {/* Admin Actions */}
+                            {isAdmin && (
+                                <div className="space-y-3">
+                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Admin</div>
+                                    <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                                        <button onClick={handleExportExcel} className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 text-left text-gray-700 transition-colors border-b border-gray-100">
+                                            <span>📊</span> Export Excel
+                                        </button>
+                                        <button onClick={handleExportPDF} className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 text-left text-gray-700 transition-colors border-b border-gray-100">
+                                            <span>📑</span> Export PDF
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm("Are you sure you want to clear all notes?")) clearAllNotes();
+                                            }}
+                                            className="w-full flex items-center gap-3 p-3 hover:bg-red-50 text-left text-red-600 transition-colors"
+                                        >
+                                            <Trash2 size={18} /> Clear Board
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                )}
+                </div>
+
 
 
                 {/* === DESKTOP HEADER (Hidden on Mobile) === */}
@@ -672,9 +757,25 @@ const BoardPage = () => {
                         {/* Session Controls Group (Timer, Music, Poll) */}
                         <div className="flex flex-nowrap items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
                             <div className="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200/50">
-                                <Timer timer={timer} isAdmin={isAdmin} onUpdateTimer={updateTimer} music={music} onUpdateMusic={updateMusic} />
+                                <Timer
+                                    timer={timer}
+                                    isAdmin={isAdmin}
+                                    onUpdateTimer={updateTimer}
+                                    volume={timerVolume}
+                                    onVolumeChange={setTimerVolume}
+                                    audioBlocked={audioBlocked}
+                                    onResumeAudio={handleResumeAudio}
+                                />
                                 <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                                <MusicPlayer music={music} isAdmin={isAdmin} onUpdateMusic={updateMusic} />
+                                <MusicPlayer
+                                    music={music}
+                                    isAdmin={isAdmin}
+                                    onUpdateMusic={updateMusic}
+                                    volume={musicVolume}
+                                    onVolumeChange={setMusicVolume}
+                                    audioBlocked={audioBlocked}
+                                    onResumeAudio={handleResumeAudio}
+                                />
                                 <div className="w-px h-6 bg-gray-300 mx-1"></div>
                                 <Poll
                                     polls={polls}
@@ -685,6 +786,7 @@ const BoardPage = () => {
                                     onClosePoll={closePoll}
                                     onDeletePoll={deletePoll}
                                     currentUserId={localStorage.getItem('crisp_user_id')}
+                                    showActivePoll={false}
                                 />
                             </div>
 
@@ -791,9 +893,9 @@ const BoardPage = () => {
                         className="flex-1 flex gap-4 md:gap-6 overflow-y-hidden md:overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
                     >
                         {sortedColumns.map(column => {
-                            // On mobile, only render the selected column
-                            // On desktop (md and up), render all columns
-                            const isMobileHidden = selectedMobileColumnId && column.id !== selectedMobileColumnId;
+                            // On mobile, completely unmount non-selected columns to prevent layout/scroll glitches
+                            // On desktop, render all columns as usual
+                            const isMobileAndHidden = selectedMobileColumnId && column.id !== selectedMobileColumnId;
 
                             return (
                                 <div
@@ -801,30 +903,32 @@ const BoardPage = () => {
                                     className={`
                                         snap-center shrink-0 h-full
                                         transition-all duration-300
-                                        ${isMobileHidden ? 'hidden md:block' : 'block w-full'} 
+                                        ${isMobileAndHidden ? 'hidden md:block' : 'block w-full'} 
                                         md:w-[45vw] lg:flex-1 lg:min-w-[300px] xl:max-w-md
                                     `}
                                 >
-                                    <Column
-                                        column={column}
-                                        notes={getNotesByColumn(column.id)}
-                                        onAddNote={handleAddNote}
-                                        onUpdateNote={updateNote}
-                                        onDeleteNote={deleteNote}
-                                        onVoteNote={voteNote}
-                                        onReactNote={reactNote}
-                                        onMoveNote={moveNote}
-                                        onAddComment={addComment}
-                                        onUpdateComment={updateComment}
-                                        onDeleteComment={deleteComment}
-                                        onUpdateColumn={updateColumn}
-                                        onDeleteColumn={deleteColumn}
-                                        currentUser={currentUser}
-                                        currentUserId={localStorage.getItem('crisp_user_id')}
-                                        isAdmin={isAdmin}
-                                        searchQuery={searchQuery}
-                                        hideTitleOnMobile={true} // Clean up mobile view by hiding redundant title
-                                    />
+                                    {(!isMobileAndHidden || window.innerWidth >= 768) && (
+                                        <Column
+                                            column={column}
+                                            notes={getNotesByColumn(column.id)}
+                                            onAddNote={handleAddNote}
+                                            onUpdateNote={updateNote}
+                                            onDeleteNote={deleteNote}
+                                            onVoteNote={voteNote}
+                                            onReactNote={reactNote}
+                                            onMoveNote={moveNote}
+                                            onAddComment={addComment}
+                                            onUpdateComment={updateComment}
+                                            onDeleteComment={deleteComment}
+                                            onUpdateColumn={updateColumn}
+                                            onDeleteColumn={deleteColumn}
+                                            currentUser={currentUser}
+                                            currentUserId={localStorage.getItem('crisp_user_id')}
+                                            isAdmin={isAdmin}
+                                            searchQuery={searchQuery}
+                                            hideTitleOnMobile={true}
+                                        />
+                                    )}
                                 </div>
                             );
                         })}
