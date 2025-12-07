@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import NoteCard from './NoteCard';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, Reorder } from 'framer-motion';
 import { COLUMN_COLORS } from '../../store/useBoard';
 
 const Column = ({
@@ -13,6 +13,7 @@ const Column = ({
     onVoteNote,
     onReactNote,
     onMoveNote,
+    onReorderNotes,
     onAddComment,
     onUpdateComment,
     onDeleteComment,
@@ -29,14 +30,16 @@ const Column = ({
     const [editTitle, setEditTitle] = useState(column.title);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    const filteredNotes = notes.filter(note => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return (
-            note.content.toLowerCase().includes(query) ||
-            note.author.toLowerCase().includes(query)
-        );
-    });
+    const filteredNotes = notes
+        .filter(note => {
+            if (!searchQuery) return true;
+            const query = searchQuery.toLowerCase();
+            return (
+                note.content.toLowerCase().includes(query) ||
+                note.author.toLowerCase().includes(query)
+            );
+        })
+        .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
 
     const handleDragOver = (e) => {
         if (!isAdmin) return;
@@ -79,8 +82,31 @@ const Column = ({
         setShowDeleteConfirm(false);
     };
 
+    const handleDragEnd = (event, info) => {
+        if (!isAdmin) return;
+        const dropPoint = info.point;
+        // Find the element at the drop point
+        const elements = document.elementsFromPoint(dropPoint.x, dropPoint.y);
+        const targetColumn = elements.find(el => el.getAttribute('data-column-id'));
+
+        if (targetColumn) {
+            const targetColumnId = targetColumn.getAttribute('data-column-id');
+            // If dropped on a different column, move the note
+            if (targetColumnId !== column.id) {
+                // Determine the note ID from the dragged element or state?
+                // Reorder.Item passes 'value' which is the note object.
+                // But onDragEnd doesn't give the value directly in all versions.
+                // However, we are inside the map, so we have access to 'note.id'.
+                // Wait, onDragEnd is defined OUTSIDE the map?
+                // No, I should define it inside the map or pass a closure?
+                // Defining it inside map is fine for capturing 'note.id'.
+            }
+        }
+    };
+
     return (
         <div
+            data-column-id={column.id}
             className={`flex flex-col h-full rounded-2xl ${column.color} p-2 md:p-4 transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-400 ring-offset-2 scale-[1.02]' : ''
                 }`}
             onDragOver={handleDragOver}
@@ -144,6 +170,7 @@ const Column = ({
                 )}
             </div>
 
+
             {/* Delete Confirmation Modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowDeleteConfirm(false)}>
@@ -191,6 +218,7 @@ const Column = ({
                 );
             })()}
 
+            {/* Content Area with Scroll */}
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
                 {/* Drop zone indicator when dragging */}
                 {isDragOver && filteredNotes.length === 0 && (
@@ -199,25 +227,48 @@ const Column = ({
                     </div>
                 )}
 
-                <AnimatePresence mode="popLayout">
+                <Reorder.Group
+                    axis="y"
+                    values={filteredNotes}
+                    onReorder={(newOrder) => isAdmin && onReorderNotes(column.id, newOrder.map(n => n.id))}
+                    className="space-y-3"
+                >
                     {filteredNotes.map(note => (
-                        <NoteCard
+                        <Reorder.Item
                             key={note.id}
-                            note={note}
-                            onUpdate={onUpdateNote}
-                            onDelete={onDeleteNote}
-                            onDelete={onDeleteNote}
-                            onVote={onVoteNote}
-                            onReact={onReactNote}
-                            onAddComment={onAddComment}
-                            onUpdateComment={onUpdateComment}
-                            onDeleteComment={onDeleteComment}
-                            currentUser={currentUser}
-                            currentUserId={currentUserId}
-                            isAdmin={isAdmin}
-                        />
+                            value={note}
+                            dragListener={isAdmin}
+                            onDragEnd={(event, info) => {
+                                if (!isAdmin) return;
+                                const elements = document.elementsFromPoint(info.point.x, info.point.y);
+                                const targetColumn = elements.find(el => el.hasAttribute('data-column-id'));
+                                if (targetColumn) {
+                                    const targetColumnId = targetColumn.getAttribute('data-column-id');
+                                    if (targetColumnId && targetColumnId !== column.id) {
+                                        onMoveNote(note.id, targetColumnId);
+                                    }
+                                }
+                            }}
+                            style={{ transform: 'translate3d(0,0,0)' }}
+                            whileDrag={{ scale: 1.05, cursor: 'grabbing' }}
+                            className={isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}
+                        >
+                            <NoteCard
+                                note={note}
+                                onUpdate={onUpdateNote}
+                                onDelete={onDeleteNote}
+                                onVote={onVoteNote}
+                                onReact={onReactNote}
+                                onAddComment={onAddComment}
+                                onUpdateComment={onUpdateComment}
+                                onDeleteComment={onDeleteComment}
+                                currentUser={currentUser}
+                                currentUserId={currentUserId}
+                                isAdmin={isAdmin}
+                            />
+                        </Reorder.Item>
                     ))}
-                </AnimatePresence>
+                </Reorder.Group>
 
                 {filteredNotes.length === 0 && !isDragOver && (
                     <div className="text-center py-10 text-gray-400 text-sm italic">

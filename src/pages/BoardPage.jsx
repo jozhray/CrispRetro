@@ -81,7 +81,9 @@ const BoardPage = () => {
         votePoll,
         closePoll,
         deletePoll,
-        clearAllNotes
+        clearAllNotes,
+        moveColumn,
+        reorderNotes
     } = useBoard(boardId);
 
     // Mobile Column Selection State
@@ -171,7 +173,7 @@ const BoardPage = () => {
             return exportData;
         }
 
-        Object.values(columns).forEach(column => {
+        sortedColumns.forEach(column => {
             // Get notes for this column directly from notes object
             const columnNotes = Object.values(notes)
                 .filter(note => note.columnId === column.id)
@@ -303,22 +305,24 @@ const BoardPage = () => {
             let lastY = 45;
 
             // Group notes by column for better display
-            Object.values(columns).forEach(column => {
+            sortedColumns.forEach(column => {
                 const columnNotes = Object.values(notes)
                     .filter(note => note.columnId === column.id)
                     .sort((a, b) => (b.votes || 0) - (a.votes || 0));
 
-                if (columnNotes.length > 0) {
-                    // Column Title
-                    doc.setFontSize(14);
-                    doc.setTextColor(0);
-                    // Check if we need a new page for the title
-                    if (lastY > 250) {
-                        doc.addPage();
-                        lastY = 20;
-                    }
-                    doc.text(column.title, 14, lastY);
+                // Always show column title, even if empty
+                // Column Title
+                doc.setFontSize(14);
+                doc.setTextColor(0);
+                // Check if we need a new page for the title
+                if (lastY > 250) {
+                    doc.addPage();
+                    lastY = 20;
+                }
+                doc.text(column.title, 14, lastY);
+                lastY += 8; // Spacing after title
 
+                if (columnNotes.length > 0) {
                     // Table
                     const tableData = columnNotes.map(note => [
                         note.content || '',
@@ -328,7 +332,7 @@ const BoardPage = () => {
                     ]);
 
                     autoTable(doc, {
-                        startY: lastY + 5,
+                        startY: lastY,
                         head: [['Note', 'Author', 'Votes', 'Comments']],
                         body: tableData,
                         theme: 'striped',
@@ -347,6 +351,12 @@ const BoardPage = () => {
                     });
 
                     lastY = doc.lastAutoTable.finalY + 15;
+                } else {
+                    // Empty state message
+                    doc.setFontSize(10);
+                    doc.setTextColor(150);
+                    doc.text("(No notes in this column)", 14, lastY);
+                    lastY += 15;
                 }
             });
 
@@ -376,7 +386,7 @@ const BoardPage = () => {
                 boardName,
                 boardId,
                 exportDate: new Date().toISOString(),
-                columns: Object.values(columns).map(column => ({
+                columns: sortedColumns.map(column => ({
                     id: column.id,
                     title: column.title,
                     color: column.color,
@@ -417,9 +427,20 @@ const BoardPage = () => {
         toast.success('Board ID copied!');
     };
 
+    const handleClearBoard = () => {
+        if (!notes || Object.keys(notes).length === 0) {
+            toast.warning("The board is already empty!");
+            return;
+        }
+
+        if (window.confirm("Are you sure you want to clear all notes? This action cannot be undone.")) {
+            clearAllNotes();
+        }
+    };
+
     return (
         <Layout>
-            {/* Global Poll Display (Single Instance) */}
+            {/* ... global components ... */}
             <Poll
                 polls={polls}
                 activePoll={activePoll}
@@ -652,9 +673,7 @@ const BoardPage = () => {
                                             <span>📑</span> Export PDF
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                if (window.confirm("Are you sure you want to clear all notes?")) clearAllNotes();
-                                            }}
+                                            onClick={handleClearBoard}
                                             className="w-full flex items-center gap-3 p-3 hover:bg-red-50 text-left text-red-600 transition-colors"
                                         >
                                             <Trash2 size={18} /> Clear Board
@@ -848,11 +867,7 @@ const BoardPage = () => {
                                 {/* Clear Board - Admin Only */}
                                 {isAdmin && (
                                     <button
-                                        onClick={() => {
-                                            if (window.confirm("Are you sure you want to clear all notes from the board? This action cannot be undone.")) {
-                                                clearAllNotes();
-                                            }
-                                        }}
+                                        onClick={handleClearBoard}
                                         className="flex items-center gap-2 h-[46px] bg-red-50 hover:bg-red-100 text-red-600 px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap border border-red-100"
                                         title="Clear all notes"
                                     >

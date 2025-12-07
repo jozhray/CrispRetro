@@ -207,13 +207,31 @@ export const useBoard = (boardId) => {
         });
     }, [saveData]);
 
+    const moveColumn = useCallback((newOrder) => {
+        setColumns(prev => {
+            const updatedColumns = { ...prev };
+            newOrder.forEach((columnId, index) => {
+                if (updatedColumns[columnId]) {
+                    updatedColumns[columnId] = { ...updatedColumns[columnId], order: index };
+                }
+            });
+            saveData({ columns: updatedColumns });
+            return updatedColumns;
+        });
+    }, [saveData]);
+
     const addNote = useCallback((columnId, content, author, authorId) => {
+        // Calculate next order
+        const columnNotes = Object.values(notes).filter(n => n.columnId === columnId);
+        const maxOrder = Math.max(...columnNotes.map(n => n.order || 0), -1);
+
         const newNote = {
             id: crypto.randomUUID(),
             content,
             author,
             authorId,
             votes: 0,
+            order: maxOrder + 1,
             createdAt: Date.now(),
             columnId
         };
@@ -223,11 +241,24 @@ export const useBoard = (boardId) => {
             saveData({ notes: updatedNotes });
             return updatedNotes;
         });
-    }, [saveData]);
+    }, [notes, saveData]);
 
     const updateNote = useCallback((noteId, content) => {
         setNotes(prev => {
             const updatedNotes = { ...prev, [noteId]: { ...prev[noteId], content } };
+            saveData({ notes: updatedNotes });
+            return updatedNotes;
+        });
+    }, [saveData]);
+
+    const reorderNotes = useCallback((columnId, newNoteOrder) => {
+        setNotes(prev => {
+            const updatedNotes = { ...prev };
+            newNoteOrder.forEach((noteId, index) => {
+                if (updatedNotes[noteId] && updatedNotes[noteId].columnId === columnId) {
+                    updatedNotes[noteId] = { ...updatedNotes[noteId], order: index };
+                }
+            });
             saveData({ notes: updatedNotes });
             return updatedNotes;
         });
@@ -570,6 +601,8 @@ export const useBoard = (boardId) => {
         votePoll,
         closePoll,
         deletePoll,
-        clearAllNotes
+        clearAllNotes,
+        moveColumn,
+        reorderNotes
     };
 };
