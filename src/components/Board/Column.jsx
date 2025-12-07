@@ -59,7 +59,6 @@ const Column = ({
     currentUserId,
     isAdmin,
     searchQuery,
-    searchQuery,
     hideTitleOnMobile = false,
     dragControls
 }) => {
