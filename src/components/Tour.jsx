@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -15,6 +16,23 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
             return () => clearTimeout(timer);
         }
     }, [storageKey]);
+
+    // Auto-scroll to target
+    useEffect(() => {
+        if (!isVisible || !steps[currentStep]?.target) return;
+
+        const element = document.querySelector(steps[currentStep].target);
+        if (element) {
+            // Small delay to ensure layout stability (e.g. keyboard closing)
+            setTimeout(() => {
+                element.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                    inline: 'center'
+                });
+            }, 300);
+        }
+    }, [currentStep, isVisible, steps]);
 
     // Calculate position relative to the document (not viewport)
     const updateTargetPosition = useCallback(() => {
@@ -104,15 +122,33 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
 
     // Calculate tooltip position relative to the viewport
     const getTooltipStyle = () => {
+        // Mobile-first: Smart Docking
+        if (window.innerWidth < 768) {
+            const isTargetBottom = targetRect && targetRect.viewportTop > window.innerHeight / 2;
+            const width = Math.min(window.innerWidth - 32, 400);
+            const left = (window.innerWidth - width) / 2;
+
+            return {
+                position: 'fixed',
+                [isTargetBottom ? 'top' : 'bottom']: '24px', // Flip position based on target
+                left: `${left}px`,
+                // No transform here to avoid conflict with Framer Motion
+                width: `${width}px`,
+                zIndex: 200 // Ensure above overlay
+            };
+        }
+
         if (!targetRect) {
             return {
                 position: 'fixed',
                 top: '50%',
                 left: '50%',
-                transform: 'translate(-50%, -50%)'
+                transform: 'translate(-50%, -50%)',
+                zIndex: 200
             };
         }
 
+        // Desktop Positioning Logic
         const tooltipWidth = 340;
         const tooltipHeight = 280;
         const padding = 16;
@@ -149,15 +185,16 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
             position: 'fixed',
             top: `${Math.max(padding, top)}px`,
             left: `${Math.max(padding, left)}px`,
-            transform: 'none'
+            transform: 'none',
+            zIndex: 200
         };
     };
 
-    return (
+    return createPortal(
         <AnimatePresence mode="wait">
             {isVisible && (
                 <motion.div
-                    className="fixed inset-0 z-[100]"
+                    className="fixed inset-0 z-[150]"
                     ref={overlayRef}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -181,7 +218,7 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.2 }}
-                            className="fixed border-2 border-cyan-400 rounded-xl pointer-events-none"
+                            className="fixed border-2 border-cyan-400 rounded-xl pointer-events-none z-[151]"
                             style={{
                                 top: targetRect.viewportTop,
                                 left: targetRect.viewportLeft,
@@ -195,16 +232,16 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
                     {/* Tour Card */}
                     <motion.div
                         key={`tooltip-${currentStep}`}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
+                        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: 20 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="w-[340px] max-w-[calc(100vw-32px)]"
+                        className="pointer-events-auto"
                         style={getTooltipStyle()}
                     >
-                        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-white/20 backdrop-blur-sm max-h-[80vh] flex flex-col">
                             {/* Header */}
-                            <div className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 p-4 text-white">
+                            <div className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 p-4 text-white shrink-0">
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
                                         <Sparkles size={16} />
@@ -223,7 +260,7 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
                             </div>
 
                             {/* Content */}
-                            <div className="p-4">
+                            <div className="p-4 overflow-y-auto">
                                 {step.icon && !hasTarget && (
                                     <div className="flex justify-center mb-3">
                                         <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-100 to-purple-100 flex items-center justify-center text-2xl">
@@ -232,7 +269,7 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
                                     </div>
                                 )}
 
-                                <p className="text-gray-600 text-sm text-center mb-4 leading-relaxed">
+                                <p className="text-gray-600 text-sm mb-4 leading-relaxed">
                                     {step.description}
                                 </p>
 
@@ -272,7 +309,7 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
                                     )}
                                     <button
                                         onClick={handleNext}
-                                        className="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                                        className="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-600 hover:to-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1 shadow-lg shadow-purple-500/20"
                                     >
                                         {currentStep === steps.length - 1 ? "Let's Go!" : (
                                             <>Next <ChevronRight size={16} /></>
@@ -284,7 +321,8 @@ const Tour = ({ steps, onComplete, storageKey = 'crisp_tour_completed' }) => {
                     </motion.div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };
 
@@ -299,19 +337,19 @@ export const HOME_TOUR_STEPS = [
         title: 'Enter Your Name',
         description: 'Start by entering your name here. This will be shown on your notes.',
         icon: '👤',
-        target: 'input[placeholder="John Doe"]'
+        target: '#user-name'
     },
     {
         title: 'Create a Board',
         description: 'Enter a board name and click "Create New Board" to start your retro!',
         icon: '✨',
-        target: 'input[placeholder="Sprint 42 Retro"]'
+        target: '#board-name'
     },
     {
         title: 'Join Existing Board',
         description: 'Or paste a Board ID here to join your team\'s session!',
         icon: '🤝',
-        target: 'input[placeholder="Enter Board ID"]'
+        target: '#join-board'
     }
 ];
 

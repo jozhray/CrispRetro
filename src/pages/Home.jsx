@@ -14,6 +14,14 @@ const Home = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const toast = useToast();
+    const nameInputRef = React.useRef(null);
+
+    const handleTourComplete = () => {
+        // Small delay to ensure modal is closed and focus is available
+        setTimeout(() => {
+            nameInputRef.current?.focus();
+        }, 100);
+    };
 
     useEffect(() => {
         // Ensure user has a unique ID
@@ -123,17 +131,20 @@ const Home = () => {
             return;
         }
 
-        localStorage.setItem('crisp_user_name', name);
         navigate(`/board/${boardId}`);
     };
 
     return (
         <Layout>
             {/* Onboarding Tour */}
-            <Tour steps={HOME_TOUR_STEPS} storageKey="crisp_home_tour_completed" />
+            <Tour
+                steps={HOME_TOUR_STEPS}
+                storageKey="crisp_home_tour_completed"
+                onComplete={handleTourComplete}
+            />
             <div className="min-h-screen relative overflow-hidden">
                 {/* Animated Background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+                <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
                     <div className="absolute inset-0 opacity-30">
                         <img
                             src="/hero-bg.jpg"
@@ -146,27 +157,29 @@ const Home = () => {
 
                     {/* Animated Particles */}
                     <div className="absolute inset-0">
-                        {[...Array(20)].map((_, i) => (
-                            <div
-                                key={i}
-                                className="absolute rounded-full bg-cyan-400/20 blur-xl animate-pulse"
-                                style={{
-                                    width: Math.random() * 100 + 50 + 'px',
-                                    height: Math.random() * 100 + 50 + 'px',
-                                    left: Math.random() * 100 + '%',
-                                    top: Math.random() * 100 + '%',
-                                    animationDelay: Math.random() * 5 + 's',
-                                    animationDuration: Math.random() * 3 + 3 + 's'
-                                }}
-                            />
-                        ))}
-                    </div>
-                </div>
+                        {
+                            [...Array(20)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className="absolute rounded-full bg-cyan-400/20 blur-xl animate-pulse"
+                                    style={{
+                                        width: Math.random() * 100 + 50 + 'px',
+                                        height: Math.random() * 100 + 50 + 'px',
+                                        left: Math.random() * 100 + '%',
+                                        top: Math.random() * 100 + '%',
+                                        animationDelay: Math.random() * 5 + 's',
+                                        animationDuration: Math.random() * 3 + 3 + 's'
+                                    }}
+                                />
+                            ))
+                        }
+                    </div >
+                </div >
 
                 {/* Content */}
-                <div className="relative z-10 max-w-4xl mx-auto px-4 pt-8 pb-8">
+                < div className="relative z-10 max-w-4xl mx-auto px-4 pt-8 pb-8" >
                     {/* Hero Section */}
-                    <div className="text-center mb-8">
+                    < div className="text-center mb-8" >
                         <div className="inline-flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-400/30 rounded-full text-cyan-300 text-sm mb-4 backdrop-blur-sm">
                             <Sparkles size={16} className="animate-pulse" />
                             <span>Next-Gen Retrospective Platform</span>
@@ -203,10 +216,10 @@ const Home = () => {
                                 <span>Team Insights</span>
                             </div>
                         </div>
-                    </div>
+                    </div >
 
                     {/* Main Card */}
-                    <div className="max-w-md mx-auto">
+                    < div className="max-w-md mx-auto" >
                         <div className="relative group">
                             {/* Glow Effect */}
                             <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-2xl blur-xl opacity-25 group-hover:opacity-40 transition-opacity duration-500"></div>
@@ -222,6 +235,8 @@ const Home = () => {
                                             Your Name
                                         </label>
                                         <input
+                                            id="user-name"
+                                            ref={nameInputRef}
                                             type="text"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
@@ -236,6 +251,7 @@ const Home = () => {
                                             Board Name {boardId && <span className="text-gray-500 text-xs">(joining existing board)</span>}
                                         </label>
                                         <input
+                                            id="board-name"
                                             type="text"
                                             value={boardName}
                                             onChange={(e) => setBoardName(e.target.value)}
@@ -278,6 +294,7 @@ const Home = () => {
                                     {/* Join Form */}
                                     <form onSubmit={handleJoinBoard} className="flex gap-2">
                                         <input
+                                            id="join-board"
                                             type="text"
                                             value={boardId}
                                             onChange={(e) => setBoardId(e.target.value)}
@@ -304,30 +321,32 @@ const Home = () => {
                         </div>
 
                         {/* Features Grid */}
-                        <div className="grid grid-cols-4 gap-4 mt-8">
-                            {[
-                                { icon: '⏱️', label: 'Timer' },
-                                { icon: '🎵', label: 'Music' },
-                                { icon: '📊', label: 'Poll' },
-                                { icon: '📥', label: 'Export' }
-                            ].map((feature, i) => (
-                                <div
-                                    key={i}
-                                    className="bg-slate-900/50 backdrop-blur-sm border border-cyan-500/10 rounded-xl p-4 text-center hover:border-cyan-500/30 transition-all group cursor-default"
-                                >
-                                    <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">
-                                        {feature.icon}
+                        < div className="grid grid-cols-4 gap-4 mt-8" >
+                            {
+                                [
+                                    { icon: '⏱️', label: 'Timer' },
+                                    { icon: '🎵', label: 'Music' },
+                                    { icon: '📊', label: 'Poll' },
+                                    { icon: '📥', label: 'Export' }
+                                ].map((feature, i) => (
+                                    <div
+                                        key={i}
+                                        className="bg-slate-900/50 backdrop-blur-sm border border-cyan-500/10 rounded-xl p-4 text-center hover:border-cyan-500/30 transition-all group cursor-default"
+                                    >
+                                        <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">
+                                            {feature.icon}
+                                        </div>
+                                        <div className="text-xs text-gray-400">
+                                            {feature.label}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-gray-400">
-                                        {feature.label}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Layout>
+                                ))
+                            }
+                        </div >
+                    </div >
+                </div >
+            </div >
+        </Layout >
     );
 };
 
