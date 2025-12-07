@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -15,6 +16,22 @@ import { useToast } from '../components/Toast';
 import { useBoard, COLUMN_COLORS } from '../store/useBoard';
 
 import BoardAudioManager from '../components/Board/BoardAudioManager';
+
+const DraggableColumn = ({ column, isMobileAndHidden, className, children }) => {
+    const dragControls = useDragControls();
+
+    return (
+        <Reorder.Item
+            value={column}
+            id={column.id}
+            dragListener={false}
+            dragControls={dragControls}
+            className={className}
+        >
+            {React.cloneElement(children, { dragControls })}
+        </Reorder.Item>
+    );
+};
 
 const BoardPage = () => {
     const { boardId } = useParams();
@@ -903,7 +920,10 @@ const BoardPage = () => {
                 {/* Board Container */}
                 <div className="flex-1 flex gap-4 overflow-hidden h-full">
                     {/* Board Grid - Columns */}
-                    <div
+                    <Reorder.Group
+                        axis="x"
+                        values={sortedColumns}
+                        onReorder={(newOrder) => isAdmin && moveColumn(newOrder.map(c => c.id))}
                         ref={boardRef}
                         className="flex-1 flex gap-4 md:gap-6 overflow-y-hidden md:overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
                     >
@@ -913,16 +933,17 @@ const BoardPage = () => {
                             const isMobileAndHidden = selectedMobileColumnId && column.id !== selectedMobileColumnId;
 
                             return (
-                                <div
+                                <DraggableColumn
                                     key={column.id}
+                                    column={column}
+                                    isMobileAndHidden={isMobileAndHidden}
                                     className={`
                                         snap-center shrink-0 h-full
-                                        transition-all duration-300
                                         ${isMobileAndHidden ? 'hidden md:block' : 'block w-full'} 
                                         md:w-[45vw] lg:flex-1 lg:min-w-[300px] xl:max-w-md
                                     `}
                                 >
-                                    {(!isMobileAndHidden || window.innerWidth >= 768) && (
+                                    {(!isMobileAndHidden || window.innerWidth >= 768) ? (
                                         <Column
                                             column={column}
                                             notes={getNotesByColumn(column.id)}
@@ -943,11 +964,11 @@ const BoardPage = () => {
                                             searchQuery={searchQuery}
                                             hideTitleOnMobile={true}
                                         />
-                                    )}
-                                </div>
+                                    ) : <div />}
+                                </DraggableColumn>
                             );
                         })}
-                    </div>
+                    </Reorder.Group>
 
                     {/* Add Column Button - Admin Only (Right side - Desktop Only) */}
                     {isAdmin && (

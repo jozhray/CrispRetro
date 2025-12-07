@@ -1,8 +1,44 @@
 import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react';
 import NoteCard from './NoteCard';
-import { AnimatePresence, Reorder } from 'framer-motion';
+import { AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { COLUMN_COLORS } from '../../store/useBoard';
+
+const DraggableNote = ({ note, isAdmin, children }) => {
+    const dragControls = useDragControls();
+
+    // We need to pass dragControls to the child (NoteCard)
+    // and also providing the drag handling logic for cross-column move
+
+    return (
+        <Reorder.Item
+            value={note}
+            dragListener={false} // Use controls
+            dragControls={dragControls}
+            style={{
+                transform: 'translate3d(0,0,0)',
+                position: 'relative',
+                zIndex: 1
+            }}
+            whileDrag={{
+                scale: 1.02,
+                zIndex: 100,
+                cursor: 'grabbing'
+            }}
+            // onDragEnd logic needs to be hoisted or handled here?
+            // The original logic was in the map. We can pass onDragEnd or handle it here if we have context.
+            // But onDragEnd needs access to 'note' and 'column' refs.
+            // The Original code defined onDragEnd inline.
+            // We can pass it as a prop.
+            {...children.props} // spread children props? No, Reorder.Item props.
+        // We need to hijack onDragEnd from the child? No.
+        // Let's copy the onDragEnd from the original list item to this component usage or implementation.
+        >
+            {React.cloneElement(children, { dragControls })}
+        </Reorder.Item>
+    );
+};
+
 
 const Column = ({
     column,
@@ -246,25 +282,7 @@ const Column = ({
                     className="space-y-3"
                 >
                     {filteredNotes.map(note => (
-                        <Reorder.Item
-                            key={note.id}
-                            value={note}
-                            dragListener={isAdmin}
-                            onDragEnd={(event, info) => {
-                                if (!isAdmin) return;
-                                const elements = document.elementsFromPoint(info.point.x, info.point.y);
-                                const targetColumn = elements.find(el => el.hasAttribute('data-column-id'));
-                                if (targetColumn) {
-                                    const targetColumnId = targetColumn.getAttribute('data-column-id');
-                                    if (targetColumnId && targetColumnId !== column.id) {
-                                        onMoveNote(note.id, targetColumnId);
-                                    }
-                                }
-                            }}
-                            style={{ transform: 'translate3d(0,0,0)' }}
-                            whileDrag={{ scale: 1.05, cursor: 'grabbing' }}
-                            className={isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}
-                        >
+                        <DraggableNote key={note.id} note={note} isAdmin={isAdmin}>
                             <NoteCard
                                 note={note}
                                 onUpdate={onUpdateNote}
@@ -278,7 +296,8 @@ const Column = ({
                                 currentUserId={currentUserId}
                                 isAdmin={isAdmin}
                             />
-                        </Reorder.Item>
+                        </DraggableNote>
+
                     ))}
                 </Reorder.Group>
 

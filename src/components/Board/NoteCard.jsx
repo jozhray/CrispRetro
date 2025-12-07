@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { ThumbsUp, Trash2, User, GripVertical, MessageSquare, Send, Edit2, X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, isAdmin }) => {
+const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, isAdmin, dragControls }) => {
     const cardRef = useRef(null);
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
@@ -124,10 +124,7 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            draggable={isAdmin}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            className={`bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:shadow-md transition-shadow relative overflow-hidden ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            className={`bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:shadow-md transition-shadow relative overflow-hidden ${isAdmin ? 'cursor-default' : ''}`}
         >
             {/* Floating thumbs up animation */}
             <AnimatePresence>
@@ -167,7 +164,10 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
             <div className="flex gap-2">
                 {/* Drag handle - Admin only */}
                 {isAdmin && (
-                    <div className="flex-shrink-0 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
+                    <div
+                        className="flex-shrink-0 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity pt-0.5 touch-none"
+                        onPointerDown={(e) => dragControls?.start(e)}
+                    >
                         <GripVertical size={16} />
                     </div>
                 )}
