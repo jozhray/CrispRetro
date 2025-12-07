@@ -194,7 +194,7 @@ const BoardPage = () => {
             // Get notes for this column directly from notes object
             const columnNotes = Object.values(notes)
                 .filter(note => note.columnId === column.id)
-                .sort((a, b) => (b.votes || 0) - (a.votes || 0));
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
 
             columnNotes.forEach(note => {
                 exportData.push({
@@ -325,7 +325,7 @@ const BoardPage = () => {
             sortedColumns.forEach(column => {
                 const columnNotes = Object.values(notes)
                     .filter(note => note.columnId === column.id)
-                    .sort((a, b) => (b.votes || 0) - (a.votes || 0));
+                    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
                 // Always show column title, even if empty
                 // Column Title
@@ -956,6 +956,7 @@ const BoardPage = () => {
                                             onAddComment={addComment}
                                             onUpdateComment={updateComment}
                                             onDeleteComment={deleteComment}
+                                            onReorderNotes={reorderNotes}
                                             onUpdateColumn={updateColumn}
                                             onDeleteColumn={deleteColumn}
                                             currentUser={currentUser}

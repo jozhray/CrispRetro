@@ -254,7 +254,8 @@ export const useBoard = (boardId) => {
     const reorderNotes = useCallback((columnId, newNoteOrder) => {
         setNotes(prev => {
             const updatedNotes = { ...prev };
-            newNoteOrder.forEach((noteId, index) => {
+            newNoteOrder.forEach((noteIdRaw, index) => {
+                const noteId = String(noteIdRaw);
                 if (updatedNotes[noteId] && updatedNotes[noteId].columnId === columnId) {
                     updatedNotes[noteId] = { ...updatedNotes[noteId], order: index };
                 }
