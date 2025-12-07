@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react';
 import NoteCard from './NoteCard';
 import { AnimatePresence, Reorder } from 'framer-motion';
 import { COLUMN_COLORS } from '../../store/useBoard';
@@ -23,7 +23,9 @@ const Column = ({
     currentUserId,
     isAdmin,
     searchQuery,
-    hideTitleOnMobile = false
+    searchQuery,
+    hideTitleOnMobile = false,
+    dragControls
 }) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -142,7 +144,17 @@ const Column = ({
                     </div>
                 ) : (
                     <>
-                        <h2 className={`font-bold text-lg ${column.titleColor} ${hideTitleOnMobile ? 'hidden md:block' : ''}`}>{column.title}</h2>
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                            {isAdmin && (
+                                <div
+                                    className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-gray-400 hover:text-gray-600 rounded touch-none"
+                                    onPointerDown={(e) => dragControls?.start(e)}
+                                >
+                                    <GripVertical size={20} />
+                                </div>
+                            )}
+                            <h2 className={`font-bold text-lg truncate ${column.titleColor} ${hideTitleOnMobile ? 'hidden md:block' : ''}`}>{column.title}</h2>
+                        </div>
                         <div className="flex items-center gap-2">
                             <span className="bg-white/50 px-2 py-1 rounded-full text-xs font-medium text-gray-600">
                                 {filteredNotes.length}
