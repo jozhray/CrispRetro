@@ -48,12 +48,21 @@ const Home = () => {
                 if (snapshot.exists()) {
                     const boardData = snapshot.val();
                     const notes = boardData.notes || {};
+                    const onlineUsers = boardData.onlineUsers || {};
 
-                    // Check if any note has the same author name but different userId (case-insensitive)
-                    const existingAuthors = Object.values(notes)
-                        .filter(note => note.author && note.author.toLowerCase() === username.trim().toLowerCase() && note.authorId !== userId);
+                    const lowerCaseUsername = username.trim().toLowerCase();
 
-                    return existingAuthors.length > 0;
+                    // 1. Check if any note has the same author name but different userId
+                    const existingNoteAuthors = Object.values(notes)
+                        .some(note => note.author && note.author.toLowerCase() === lowerCaseUsername && note.authorId !== userId);
+
+                    if (existingNoteAuthors) return true;
+
+                    // 2. Check online users
+                    const existingOnlineUsers = Object.values(onlineUsers)
+                        .some(user => user.name && user.name.toLowerCase() === lowerCaseUsername && user.id !== userId);
+
+                    return existingOnlineUsers;
                 }
             } catch (error) {
                 console.error("Error checking username in Firebase:", error);
