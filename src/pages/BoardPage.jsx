@@ -28,7 +28,9 @@ const DraggableColumn = ({ column, isMobileAndHidden, className, children }) => 
             dragControls={dragControls}
             className={className}
         >
-            {React.cloneElement(children, { dragControls })}
+            {React.isValidElement(children) && typeof children.type !== 'string'
+                ? React.cloneElement(children, { dragControls })
+                : children}
         </Reorder.Item>
     );
 };
