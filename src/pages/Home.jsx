@@ -131,6 +131,7 @@ const Home = () => {
             return;
         }
 
+        localStorage.setItem('crisp_user_name', name);
         navigate(`/board/${boardId}`);
     };
 
