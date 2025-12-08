@@ -13,7 +13,14 @@ const TRACKS = [
     { name: 'Sprint Mode', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
     { name: 'Chill Vibes', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3' },
     { name: 'Retro Thinking', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
-    { name: 'Action Items', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' }
+    { name: 'Action Items', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3' },
+    { name: 'Lounge Session', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3' },
+    { name: 'Relaxing River', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3' },
+    { name: 'Uplifting Sky', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3' },
+    { name: 'Positive Vibes', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3' },
+    { name: 'Sunset Groove', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3' },
+    { name: 'Deep Focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3' },
+    { name: 'Calm Night', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-17.mp3' }
 ];
 
 const MusicPlayer = ({
