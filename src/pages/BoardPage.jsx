@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AnimatePresence, Reorder, useDragControls } from 'framer-motion';
+import { AnimatePresence, Reorder, useDragControls, LayoutGroup } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -17,7 +17,7 @@ import { useBoard, COLUMN_COLORS } from '../store/useBoard';
 
 import BoardAudioManager from '../components/Board/BoardAudioManager';
 
-const DraggableColumn = ({ column, isMobileAndHidden, className, children }) => {
+const DraggableColumn = ({ column, isMobileAndHidden, className, children, onDragStart, onDragEnd }) => {
     const dragControls = useDragControls();
 
     return (
@@ -27,9 +27,11 @@ const DraggableColumn = ({ column, isMobileAndHidden, className, children }) => 
             dragListener={false}
             dragControls={dragControls}
             className={className}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
         >
             {React.isValidElement(children) && typeof children.type !== 'string'
-                ? React.cloneElement(children, { dragControls })
+                ? React.cloneElement(children, { dragControls, onDragStart, onDragEnd })
                 : children}
         </Reorder.Item>
     );
@@ -39,6 +41,7 @@ const BoardPage = () => {
     const { boardId } = useParams();
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const [isDragging, setIsDragging] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showUserList, setShowUserList] = useState(false);
     const [showAddColumnModal, setShowAddColumnModal] = useState(false);
@@ -102,8 +105,18 @@ const BoardPage = () => {
         deletePoll,
         clearAllNotes,
         moveColumn,
-        reorderNotes
+        reorderNotes,
+        allMembers
     } = useBoard(boardId);
+
+    // Compute offline users
+    const offlineUsers = React.useMemo(() => {
+        if (!allMembers) return [];
+        const onlineIds = new Set(onlineUsers.map(u => u.id));
+        return Object.values(allMembers)
+            .filter(m => !onlineIds.has(m.id))
+            .sort((a, b) => b.lastSeen - a.lastSeen);
+    }, [allMembers, onlineUsers]);
 
     // Mobile Column Selection State
     const [selectedMobileColumnId, setSelectedMobileColumnId] = useState(() => {
@@ -379,6 +392,41 @@ const BoardPage = () => {
                 }
             });
 
+            // Add Team Members Page
+            if (showUserList && allMembers) { // Only if we avail list
+                // Actually, requirement says "add the members who ever joined in the board as Joined Team member list in the report"
+                // So we should always add it if data exists
+            }
+
+            if (allMembers && Object.keys(allMembers).length > 0) {
+                doc.addPage();
+                doc.setFontSize(16);
+                doc.setTextColor(41, 128, 185);
+                doc.text("Joined Team Members", 14, 20);
+
+                const memberData = Object.values(allMembers)
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                    .map(m => [
+                        m.name || 'Anonymous',
+                        m.joinedAt ? new Date(m.joinedAt).toLocaleString() : 'Unknown',
+                        m.lastSeen ? new Date(m.lastSeen).toLocaleString() : 'Unknown'
+                    ]);
+
+                autoTable(doc, {
+                    startY: 25,
+                    head: [['Name', 'Joined Time', 'Last Seen']],
+                    body: memberData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [41, 128, 185] },
+                });
+
+                // Add total member count
+                const totalMembers = Object.keys(allMembers).length;
+                doc.setFontSize(11);
+                doc.setTextColor(60, 60, 60);
+                doc.text(`Total Members: ${totalMembers}`, 14, doc.lastAutoTable.finalY + 10);
+            }
+
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const nameToUse = boardName || 'Retro-Board';
@@ -549,7 +597,7 @@ const BoardPage = () => {
                 storageKey={isAdmin ? 'crisp_board_admin_tour_completed' : 'crisp_board_user_tour_completed'}
             />
 
-            <div className="relative z-10 flex flex-col h-[calc(100vh-4rem)]">
+            <div className={`relative z-10 flex flex-col h-[calc(100vh-4rem)] ${isDragging ? 'select-none' : ''}`}>
 
                 {/* === MOBILE HEADER (Single Line) === */}
                 <div className="md:hidden flex items-center justify-between p-3 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 mb-2">
@@ -746,7 +794,7 @@ const BoardPage = () => {
                                     title="Show all online users"
                                 >
                                     <span className="text-xs font-medium text-gray-500 hidden lg:inline mr-1 group-hover:text-gray-700">
-                                        {onlineUsers.length} online
+                                        {onlineUsers.length} online {offlineUsers.length > 0 && `• ${offlineUsers.length} offline`}
                                     </span>
                                     <div className="flex items-center -space-x-2 group-hover:space-x-0.5 transition-all">
                                         {onlineUsers.slice(0, 4).map((user, index) => (
@@ -779,10 +827,32 @@ const BoardPage = () => {
                                                         {user.name.charAt(0).toUpperCase()}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium text-gray-800 truncate">{user.name}</div>
+                                                        <div className="text-sm font-medium text-gray-800 truncate">
+                                                            {user.name} {user.id === localStorage.getItem('crisp_user_id') && <span className="text-blue-500 font-bold">(You)</span>}
+                                                        </div>
+                                                        <div className="text-[10px] text-green-600 font-medium">Online</div>
                                                     </div>
                                                 </div>
                                             ))}
+
+                                            {offlineUsers.length > 0 && (
+                                                <>
+                                                    <div className="mt-2 mb-1 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Offline</div>
+                                                    {offlineUsers.map(user => (
+                                                        <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors opacity-70">
+                                                            <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                                                                {user.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-sm font-medium text-gray-600 truncate">{user.name}</div>
+                                                                <div className="text-[10px] text-gray-400">
+                                                                    Last seen: {user.lastSeen ? new Date(user.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -922,56 +992,60 @@ const BoardPage = () => {
                 {/* Board Container */}
                 <div className="flex-1 flex gap-4 overflow-hidden h-full">
                     {/* Board Grid - Columns */}
-                    <Reorder.Group
-                        axis="x"
-                        values={sortedColumns}
-                        onReorder={(newOrder) => isAdmin && moveColumn(newOrder.map(c => c.id))}
-                        ref={boardRef}
-                        className="flex-1 flex gap-4 md:gap-6 overflow-y-hidden md:overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
-                    >
-                        {sortedColumns.map(column => {
-                            // On mobile, completely unmount non-selected columns to prevent layout/scroll glitches
-                            // On desktop, render all columns as usual
-                            const isMobileAndHidden = selectedMobileColumnId && column.id !== selectedMobileColumnId;
+                    <LayoutGroup>
+                        <Reorder.Group
+                            axis="x"
+                            values={sortedColumns}
+                            onReorder={(newOrder) => isAdmin && moveColumn(newOrder.map(c => c.id))}
+                            ref={boardRef}
+                            className="flex-1 flex gap-4 md:gap-6 overflow-y-hidden md:overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
+                        >
+                            {sortedColumns.map(column => {
+                                // On mobile, completely unmount non-selected columns to prevent layout/scroll glitches
+                                // On desktop, render all columns as usual
+                                const isMobileAndHidden = selectedMobileColumnId && column.id !== selectedMobileColumnId;
 
-                            return (
-                                <DraggableColumn
-                                    key={column.id}
-                                    column={column}
-                                    isMobileAndHidden={isMobileAndHidden}
-                                    className={`
+                                return (
+                                    <DraggableColumn
+                                        key={column.id}
+                                        column={column}
+                                        isMobileAndHidden={isMobileAndHidden}
+                                        onDragStart={() => setIsDragging(true)}
+                                        onDragEnd={() => setIsDragging(false)}
+                                        className={`
                                         snap-center shrink-0 h-full
                                         ${isMobileAndHidden ? 'hidden md:block' : 'block w-full'} 
                                         md:w-[45vw] lg:flex-1 lg:min-w-[300px] xl:max-w-md
                                     `}
-                                >
-                                    {(!isMobileAndHidden || window.innerWidth >= 768) ? (
-                                        <Column
-                                            column={column}
-                                            notes={getNotesByColumn(column.id)}
-                                            onAddNote={handleAddNote}
-                                            onUpdateNote={updateNote}
-                                            onDeleteNote={deleteNote}
-                                            onVoteNote={voteNote}
-                                            onReactNote={reactNote}
-                                            onMoveNote={moveNote}
-                                            onAddComment={addComment}
-                                            onUpdateComment={updateComment}
-                                            onDeleteComment={deleteComment}
-                                            onReorderNotes={reorderNotes}
-                                            onUpdateColumn={updateColumn}
-                                            onDeleteColumn={deleteColumn}
-                                            currentUser={currentUser}
-                                            currentUserId={localStorage.getItem('crisp_user_id')}
-                                            isAdmin={isAdmin}
-                                            searchQuery={searchQuery}
-                                            hideTitleOnMobile={true}
-                                        />
-                                    ) : <div />}
-                                </DraggableColumn>
-                            );
-                        })}
-                    </Reorder.Group>
+                                    >
+                                        {(!isMobileAndHidden || window.innerWidth >= 768) ? (
+                                            <Column
+                                                column={column}
+                                                notes={getNotesByColumn(column.id)}
+                                                onAddNote={handleAddNote}
+                                                onUpdateNote={updateNote}
+                                                onDeleteNote={deleteNote}
+                                                onVoteNote={voteNote}
+                                                onReactNote={reactNote}
+                                                onMoveNote={moveNote}
+                                                onAddComment={addComment}
+                                                onUpdateComment={updateComment}
+                                                onDeleteComment={deleteComment}
+                                                onReorderNotes={reorderNotes}
+                                                onUpdateColumn={updateColumn}
+                                                onDeleteColumn={deleteColumn}
+                                                currentUser={currentUser}
+                                                currentUserId={localStorage.getItem('crisp_user_id')}
+                                                isAdmin={isAdmin}
+                                                searchQuery={searchQuery}
+                                                hideTitleOnMobile={true}
+                                            />
+                                        ) : <div />}
+                                    </DraggableColumn>
+                                );
+                            })}
+                        </Reorder.Group>
+                    </LayoutGroup>
 
                     {/* Add Column Button - Admin Only (Right side - Desktop Only) */}
                     {isAdmin && (

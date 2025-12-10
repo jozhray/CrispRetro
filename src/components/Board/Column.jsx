@@ -4,7 +4,7 @@ import NoteCard from './NoteCard';
 import { AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { COLUMN_COLORS } from '../../store/useBoard';
 
-const DraggableNote = ({ note, isAdmin, onDragEnd, children }) => {
+const DraggableNote = ({ note, isAdmin, onDragEnd, onDragStart, children }) => {
     const dragControls = useDragControls();
 
     return (
@@ -13,17 +13,20 @@ const DraggableNote = ({ note, isAdmin, onDragEnd, children }) => {
             layoutId={note.id}
             dragListener={false}
             dragControls={dragControls}
+            onDragStart={onDragStart}
             onDragEnd={onDragEnd}
+            drag
             style={{
                 transform: 'translate3d(0,0,0)',
                 position: 'relative',
                 zIndex: 1
             }}
             whileDrag={{
-                scale: 1.02,
+                scale: 1.05,
                 zIndex: 100,
                 cursor: 'grabbing'
             }}
+            className="select-none"
         >
             {React.cloneElement(children, { dragControls })}
         </Reorder.Item>
@@ -51,12 +54,15 @@ const Column = ({
     isAdmin,
     searchQuery,
     hideTitleOnMobile = false,
-    dragControls
+    dragControls,
+    onDragStart,
+    onDragEnd
 }) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(column.title);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isNoteDragging, setIsNoteDragging] = useState(false);
 
     const filteredNotes = notes
         .filter(note => {
@@ -257,7 +263,7 @@ const Column = ({
             })()}
 
             {/* Content Area with Scroll */}
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+            <div className={`flex-1 ${isNoteDragging ? 'overflow-visible' : 'overflow-y-auto'} space-y-3 pr-1 custom-scrollbar`}>
                 {/* Drop zone indicator when dragging */}
                 {isDragOver && filteredNotes.length === 0 && (
                     <div className="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center text-blue-500 text-sm font-medium bg-blue-50/50">
@@ -276,7 +282,15 @@ const Column = ({
                             key={note.id}
                             note={note}
                             isAdmin={isAdmin}
+                            onDragStart={() => {
+                                document.body.classList.add('is-dragging');
+                                setIsNoteDragging(true);
+                                if (onDragStart) onDragStart();
+                            }}
                             onDragEnd={(event, info) => {
+                                document.body.classList.remove('is-dragging');
+                                setIsNoteDragging(false);
+                                if (onDragEnd) onDragEnd();
                                 if (!isAdmin) return;
                                 const elements = document.elementsFromPoint(info.point.x, info.point.y);
                                 const targetColumn = elements.find(el => el.hasAttribute('data-column-id'));

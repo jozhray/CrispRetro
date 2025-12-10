@@ -11,6 +11,7 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
     const [newComment, setNewComment] = useState("");
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editContent, setEditContent] = useState("");
+    const [isVoting, setIsVoting] = useState(false); // Prevent double-clicks
     const canDelete = isAdmin || (note.authorId && note.authorId === currentUserId);
 
     // Check if current user has voted
@@ -51,6 +52,7 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
 
     const handleVote = () => {
         if (!hasContent) return;
+
         // Only show animation if we're adding a vote, not removing
         if (!hasVoted) {
             setShowVoteAnimation(true);

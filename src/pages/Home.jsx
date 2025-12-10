@@ -131,7 +131,10 @@ const Home = () => {
             toast.warning('Please enter your name first');
             return;
         }
-        if (!boardId.trim()) return;
+        if (!boardId.trim()) {
+            toast.warning('Please enter a Board ID to join');
+            return;
+        }
 
         // Check for duplicate username
         const isDuplicate = await checkDuplicateUsername(boardId, name);

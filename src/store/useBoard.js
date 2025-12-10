@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '../firebase';
-import { ref, onValue, set, update, remove } from 'firebase/database';
+import { ref, onValue, set, update, remove, runTransaction, onDisconnect } from 'firebase/database';
 import { useToast } from '../components/Toast';
 
 // Default columns for new boards
@@ -30,6 +30,7 @@ export const useBoard = (boardId) => {
     const [music, setMusic] = useState({ isPlaying: false });
     const [polls, setPolls] = useState({});
     const [onlineUsers, setOnlineUsers] = useState([]);
+    const [allMembers, setAllMembers] = useState({});
     const [isFirebaseReady, setIsFirebaseReady] = useState(false);
 
     // Toast for notifications
@@ -50,25 +51,44 @@ export const useBoard = (boardId) => {
     useEffect(() => {
         if (!boardId || !database || !currentUserId || !currentUser) return;
 
-        const userRef = ref(database, `boards/${boardId}/onlineUsers/${currentUserId}`);
+        // Create a unique connection ID for this session/tab
+        const connectionId = crypto.randomUUID();
+        const userRef = ref(database, `boards/${boardId}/onlineUsers/${currentUserId}/${connectionId}`);
+        const memberRef = ref(database, `boards/${boardId}/allMembers/${currentUserId}`);
 
-        // Add user to online users
+        // Set user as online for this specific connection
         set(userRef, {
             id: currentUserId,
             name: currentUser,
             joinedAt: Date.now()
+        }).then(() => {
+            // Remove ONLY this connection on disconnect
+            onDisconnect(userRef).remove();
+        }).catch(err => console.error("Error setting online status:", err));
+
+        // Track in "allMembers" (persistent history)
+        runTransaction(memberRef, (currentData) => {
+            // Logic remains same - updates lastSeen
+            if (currentData) {
+                return {
+                    ...currentData,
+                    name: currentUser,
+                    lastSeen: Date.now()
+                };
+            } else {
+                return {
+                    id: currentUserId,
+                    name: currentUser,
+                    joinedAt: Date.now(), // First time join
+                    lastSeen: Date.now()
+                };
+            }
         });
 
-        // Remove user when they leave
-        const cleanup = () => {
-            remove(userRef);
-        };
-
-        window.addEventListener('beforeunload', cleanup);
-
+        // Cleanup on component unmount
         return () => {
-            window.removeEventListener('beforeunload', cleanup);
-            cleanup();
+            onDisconnect(userRef).cancel();
+            remove(userRef);
         };
     }, [boardId, currentUserId, currentUser]);
 
@@ -89,15 +109,43 @@ export const useBoard = (boardId) => {
                     setTimer(data.timer || { isRunning: false, timeLeft: 180 });
                     setMusic(data.music || { isPlaying: false });
                     setPolls(data.polls || {});
-                    // Convert online users object to array
-                    const users = data.onlineUsers ? Object.values(data.onlineUsers) : [];
+
+                    // Handle multi-connection online users
+                    // Structure: onlineUsers / {userId} / {connectionId} / {userData}
+                    const users = [];
+                    if (data.onlineUsers) {
+                        Object.keys(data.onlineUsers).forEach(userId => {
+                            const userOrConnections = data.onlineUsers[userId];
+                            if (!userOrConnections) return;
+
+                            // mixed mode support: check if it's a direct user object (legacy) or connection map (new)
+                            if (userOrConnections.id && userOrConnections.name) {
+                                // Legacy: It's the user object directly
+                                users.push(userOrConnections);
+                            } else {
+                                // New: It's a map of connections
+                                const connections = userOrConnections;
+                                const connectionKeys = Object.keys(connections);
+                                if (connectionKeys.length > 0) {
+                                    // Use the latest connection (last one added usually, or just first)
+                                    // We just need one valid user object for this ID
+                                    const activeConnection = connections[connectionKeys[0]];
+                                    if (activeConnection && activeConnection.id) {
+                                        users.push(activeConnection);
+                                    }
+                                }
+                            }
+                        });
+                    }
                     setOnlineUsers(users);
+                    setAllMembers(data.allMembers || {});
                 } else {
                     setNotes({});
                     setColumns(DEFAULT_COLUMNS);
                     setBoardName('Sprint Retro');
                     setAdminId(null);
                     setOnlineUsers([]);
+                    setAllMembers({});
                 }
             });
             return () => unsubscribe();
@@ -604,6 +652,7 @@ export const useBoard = (boardId) => {
         deletePoll,
         clearAllNotes,
         moveColumn,
-        reorderNotes
+        reorderNotes,
+        allMembers
     };
 };
