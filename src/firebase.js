@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
+import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 // For this to work, you need to create a .env file with these values
@@ -16,11 +17,13 @@ const firebaseConfig = {
 // Initialize Firebase only if config is present
 let app;
 let database;
+let auth;
 
 try {
     if (firebaseConfig.apiKey && firebaseConfig.databaseURL) {
         app = initializeApp(firebaseConfig);
         database = getDatabase(app);
+        auth = getAuth(app);
         console.log("Firebase initialized successfully");
     } else {
         console.warn("Firebase credentials not found. Falling back to local storage.");
@@ -29,4 +32,4 @@ try {
     console.error("Error initializing Firebase:", error);
 }
 
-export { database };
+export { database, auth };

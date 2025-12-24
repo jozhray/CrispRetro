@@ -62,16 +62,15 @@ const Login = () => {
                 navigate('/');
             }
             else if (mode === 'forgot') {
-                if (!email.trim() || !password) {
-                    toast.warning('Please enter email and new password');
+                if (!email.trim()) {
+                    toast.warning('Please enter your email address');
                     setIsLoading(false);
                     return;
                 }
 
-                await userService.resetPassword(email, password);
-                toast.success("Password updated! Please login.");
+                await userService.sendResetEmail(email);
+                toast.success("Reset link sent! Please check your email inbox.");
                 setMode('login');
-                setPassword('');
             }
         } catch (error) {
             console.error(error);
@@ -191,23 +190,25 @@ const Login = () => {
                                 </div>
                             </div>
 
-                            {/* Password - All Modes (Reset treats this as New Password) */}
-                            <div>
-                                <label className="block text-sm font-medium text-pink-300 mb-2">
-                                    {mode === 'forgot' ? 'New Password' : 'Password'}
-                                </label>
-                                <div className="relative">
-                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
-                                        className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-pink-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-pink-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
-                                        required
-                                    />
+                            {/* Password - Login & Register Only */}
+                            {mode !== 'forgot' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-pink-300 mb-2">
+                                        Password
+                                    </label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-pink-500/30 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-pink-400 focus:border-transparent outline-none transition-all backdrop-blur-sm"
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Confirm Password - Register Only */}
                             {mode === 'register' && (

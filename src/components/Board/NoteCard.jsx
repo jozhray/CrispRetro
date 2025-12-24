@@ -15,16 +15,16 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     const [showColorPicker, setShowColorPicker] = useState(false);
 
     const NOTE_COLORS = [
-        { id: 'white', value: '#ffffff', label: 'White' },
-        { id: 'yellow', value: '#fff9c4', label: 'Yellow' },
-        { id: 'blue', value: '#e3f2fd', label: 'Blue' },
-        { id: 'green', value: '#e8f5e9', label: 'Green' },
-        { id: 'red', value: '#ffebee', label: 'Red' },
-        { id: 'purple', value: '#f3e5f5', label: 'Purple' },
-        { id: 'orange', value: '#fff3e0', label: 'Orange' },
-        { id: 'gray', value: '#f5f5f5', label: 'Gray' },
-        { id: 'cyan', value: '#e0f7fa', label: 'Cyan' },
-        { id: 'pink', value: '#fce4ec', label: 'Pink' },
+        { id: 'white', value: '#ffffff', preview: '#f8fafc', label: 'White' },
+        { id: 'yellow', value: '#fff9c4', preview: '#facc15', label: 'Yellow' },
+        { id: 'blue', value: '#e3f2fd', preview: '#3b82f6', label: 'Blue' },
+        { id: 'green', value: '#e8f5e9', preview: '#22c55e', label: 'Green' },
+        { id: 'red', value: '#ffebee', preview: '#ef4444', label: 'Red' },
+        { id: 'purple', value: '#f3e5f5', preview: '#a855f7', label: 'Purple' },
+        { id: 'orange', value: '#fff3e0', preview: '#f97316', label: 'Orange' },
+        { id: 'gray', value: '#f5f5f5', preview: '#94a3b8', label: 'Gray' },
+        { id: 'cyan', value: '#e0f7fa', preview: '#06b6d4', label: 'Cyan' },
+        { id: 'pink', value: '#fce4ec', preview: '#ec4899', label: 'Pink' },
     ];
 
     const getContrastColor = (hexValue) => {
@@ -52,11 +52,12 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
         }
     }, [note.content]);
 
-    // Handle click outside to close comments
+    // Handle click outside to close comments and color picker
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (cardRef.current && !cardRef.current.contains(event.target) && showComments) {
-                setShowComments(false);
+            if (cardRef.current && !cardRef.current.contains(event.target)) {
+                if (showComments) setShowComments(false);
+                if (showColorPicker) setShowColorPicker(false);
             }
         };
 
@@ -64,7 +65,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showComments]);
+    }, [showComments, showColorPicker]);
 
     // Detect when votes increase (only show animation when votes go up)
     useEffect(() => {
@@ -294,17 +295,18 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute bottom-12 right-4 z-20 bg-white shadow-xl border border-gray-100 rounded-lg p-2 flex gap-1.5 flex-wrap max-w-[200px]"
+                        className="absolute bottom-12 right-4 z-[70] bg-white shadow-2xl border border-gray-100 rounded-lg p-2.5 flex gap-1.5 flex-wrap max-w-[200px]"
                     >
                         {NOTE_COLORS.map(c => (
                             <button
                                 key={c.id}
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.stopPropagation(); // Prevent re-triggering logic
                                     onUpdateColor(note.id, c.value);
                                     setShowColorPicker(false);
                                 }}
-                                className={`w-6 h-6 rounded-full border border-gray-200 transition-transform hover:scale-110 ${note.color === c.value ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
-                                style={{ backgroundColor: c.value }}
+                                className={`w-6 h-6 rounded-full border border-gray-100 shadow-sm transition-transform hover:scale-110 ${note.color === c.value ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
+                                style={{ backgroundColor: c.preview }}
                                 title={c.label}
                             />
                         ))}

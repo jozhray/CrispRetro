@@ -3,7 +3,7 @@ import React from 'react';
 const AnimatedBackground = () => {
     // Generate bubbles once and persist them
     const bubbles = React.useMemo(() => {
-        return [...Array(15)].map((_, i) => ({
+        return [...Array(30)].map((_, i) => ({
             id: i,
             width: Math.random() * 80 + 30 + 'px',
             height: Math.random() * 80 + 30 + 'px',
@@ -20,7 +20,7 @@ const AnimatedBackground = () => {
                 {bubbles.map((bubble) => (
                     <div
                         key={bubble.id}
-                        className="absolute rounded-full border-2 border-blue-400/40 bg-blue-300/10 animate-float"
+                        className="absolute rounded-full border border-blue-400/50 bg-blue-300/30 animate-float"
                         style={{
                             width: bubble.width,
                             height: bubble.height,

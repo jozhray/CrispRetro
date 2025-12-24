@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { database } from '../firebase';
 import { ref, onValue, set, update, remove, runTransaction, onDisconnect, get } from 'firebase/database';
 import { useToast } from '../components/Toast';
@@ -6,20 +6,26 @@ import { sanitizeEmail } from '../services/userService';
 
 // Default columns for new boards
 const DEFAULT_COLUMNS = {
-    well: { id: 'well', title: 'What went Well', color: 'bg-green-50 border-green-200', titleColor: 'text-green-800', order: 0 },
-    notWell: { id: 'notWell', title: "Didn't go Well", color: 'bg-red-50 border-red-200', titleColor: 'text-red-800', order: 1 },
-    improve: { id: 'improve', title: 'What can be improved', color: 'bg-yellow-50 border-yellow-200', titleColor: 'text-yellow-800', order: 2 },
-    kudos: { id: 'kudos', title: 'Kudos', color: 'bg-purple-50 border-purple-200', titleColor: 'text-purple-800', order: 3 },
+    well: { id: 'well', title: 'What went Well', color: 'bg-green-50 border-green-200', titleColor: 'text-green-900', order: 0 },
+    notWell: { id: 'notWell', title: "Didn't go Well", color: 'bg-red-50 border-red-200', titleColor: 'text-red-900', order: 1 },
+    improve: { id: 'improve', title: 'What can be improved', color: 'bg-yellow-50 border-yellow-200', titleColor: 'text-yellow-900', order: 2 },
+    kudos: { id: 'kudos', title: 'Kudos', color: 'bg-purple-50 border-purple-200', titleColor: 'text-purple-900', order: 3 },
 };
 
 // Available colors for columns
 export const COLUMN_COLORS = [
-    { id: 'green', color: 'bg-green-50 border-green-200', titleColor: 'text-green-800' },
-    { id: 'red', color: 'bg-red-50 border-red-200', titleColor: 'text-red-800' },
-    { id: 'yellow', color: 'bg-yellow-50 border-yellow-200', titleColor: 'text-yellow-800' },
-    { id: 'purple', color: 'bg-purple-50 border-purple-200', titleColor: 'text-purple-800' },
-    { id: 'blue', color: 'bg-blue-50 border-blue-200', titleColor: 'text-blue-800' },
-    { id: 'orange', color: 'bg-orange-50 border-orange-200', titleColor: 'text-orange-800' },
+    { id: 'emerald', color: 'bg-green-50 border-green-200', titleColor: 'text-green-900', previewColor: 'bg-emerald-500' },
+    { id: 'rose', color: 'bg-red-50 border-red-200', titleColor: 'text-red-900', previewColor: 'bg-rose-500' },
+    { id: 'amber', color: 'bg-yellow-50 border-yellow-200', titleColor: 'text-yellow-900', previewColor: 'bg-amber-500' },
+    { id: 'violet', color: 'bg-purple-50 border-purple-200', titleColor: 'text-purple-900', previewColor: 'bg-purple-500' },
+    { id: 'sky', color: 'bg-blue-50 border-blue-200', titleColor: 'text-blue-900', previewColor: 'bg-sky-500' },
+    { id: 'orange', color: 'bg-orange-50 border-orange-200', titleColor: 'text-orange-900', previewColor: 'bg-orange-500' },
+    { id: 'indigo', color: 'bg-indigo-50 border-indigo-200', titleColor: 'text-indigo-900', previewColor: 'bg-indigo-500' },
+    { id: 'pink', color: 'bg-pink-50 border-pink-200', titleColor: 'text-pink-900', previewColor: 'bg-pink-500' },
+    { id: 'teal', color: 'bg-teal-50 border-teal-200', titleColor: 'text-teal-900', previewColor: 'bg-teal-500' },
+    { id: 'lime', color: 'bg-lime-50 border-lime-200', titleColor: 'text-lime-900', previewColor: 'bg-lime-500' },
+    { id: 'fuchsia', color: 'bg-fuchsia-50 border-fuchsia-200', titleColor: 'text-fuchsia-900', previewColor: 'bg-fuchsia-500' },
+    { id: 'slate', color: 'bg-slate-50 border-slate-200', titleColor: 'text-slate-900', previewColor: 'bg-slate-500' }
 ];
 
 export const useBoard = (boardId) => {
@@ -33,6 +39,11 @@ export const useBoard = (boardId) => {
     const [onlineUsers, setOnlineUsers] = useState([]);
     const [allMembers, setAllMembers] = useState({});
     const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+
+    // Memoized sorted columns
+    const sortedColumns = useMemo(() => {
+        return Object.values(columns).sort((a, b) => (a.order || 0) - (b.order || 0));
+    }, [columns]);
 
     // Toast for notifications
     const toast = useToast();
@@ -179,6 +190,25 @@ export const useBoard = (boardId) => {
                     setOnlineUsers(users);
                     setAllMembers(data.allMembers || {});
                 } else {
+                    // Try LocalStorage Fallback if Firebase has no data yet
+                    // This is helpful during the immediate transition after creation
+                    const saved = localStorage.getItem(`crisp_board_${boardId}`);
+                    if (saved) {
+                        try {
+                            const parsed = JSON.parse(saved);
+                            setNotes(parsed.notes || {});
+                            setColumns(parsed.columns || DEFAULT_COLUMNS);
+                            setBoardName(parsed.name || 'Sprint Retro');
+                            setAdminId(parsed.adminId || null);
+                            setTimer(parsed.timer || { isRunning: false, timeLeft: 180 });
+                            setMusic(parsed.music || { isPlaying: false });
+                            setPolls(parsed.polls || {});
+                            return; // Keep local data until Firebase has something
+                        } catch (e) {
+                            console.error("Failed to parse LocalStorage fallback:", e);
+                        }
+                    }
+
                     setNotes({});
                     setColumns(DEFAULT_COLUMNS);
                     setBoardName('Sprint Retro');
@@ -664,9 +694,6 @@ export const useBoard = (boardId) => {
             toast.success("Board cleared (Local)");
         }
     }, [boardId, saveData, toast]);
-
-    // Get sorted columns
-    const sortedColumns = Object.values(columns).sort((a, b) => (a.order || 0) - (b.order || 0));
 
     // Get active poll (most recent active)
     const activePoll = Object.values(polls).find(p => p.isActive) || null;

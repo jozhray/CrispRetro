@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X, GripVertical } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Check, X, GripVertical, Sparkles, MoreVertical } from 'lucide-react';
 import NoteCard from './NoteCard';
 import { AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { COLUMN_COLORS } from '../../store/useBoard';
@@ -63,7 +63,26 @@ const Column = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editTitle, setEditTitle] = useState(column.title);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
     const [isNoteDragging, setIsNoteDragging] = useState(false);
+    const menuRef = useRef(null);
+
+    // Handle click outside to close actions menu
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setShowActionsMenu(false);
+            }
+        };
+
+        if (showActionsMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showActionsMenu]);
 
     const filteredNotes = notes
         .filter(note => {
@@ -151,7 +170,21 @@ const Column = ({
     return (
         <div
             data-column-id={column.id}
-            className={`flex flex-col h-full rounded-2xl ${column.color} p-2 md:p-4 transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-400 ring-offset-2 scale-[1.02]' : ''
+            className={`flex flex-col h-full rounded-2xl relative ${isNoteDragging ? 'z-[60]' : 'z-10'} ${(() => {
+                const color = (column.color || 'slate').toLowerCase();
+                if (color.includes('green') || color.includes('emerald')) return 'bg-emerald-500/15';
+                if (color.includes('red') || color.includes('rose')) return 'bg-rose-500/15';
+                if (color.includes('yellow') || color.includes('amber')) return 'bg-amber-500/15';
+                if (color.includes('purple') || color.includes('violet')) return 'bg-purple-500/15';
+                if (color.includes('blue') || color.includes('sky')) return 'bg-sky-500/15';
+                if (color.includes('orange')) return 'bg-orange-500/15';
+                if (color.includes('indigo')) return 'bg-indigo-500/15';
+                if (color.includes('pink')) return 'bg-pink-500/15';
+                if (color.includes('teal')) return 'bg-teal-500/15';
+                if (color.includes('lime')) return 'bg-lime-500/15';
+                if (color.includes('fuchsia')) return 'bg-fuchsia-500/15';
+                return 'bg-slate-400/20'; // Slate is more gray
+            })()} backdrop-blur-xl border border-white/40 shadow-xl p-2 md:p-4 transition-all duration-200 ${isDragOver ? 'ring-2 ring-blue-400 ring-offset-2 scale-[1.02]' : ''
                 }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -202,22 +235,64 @@ const Column = ({
                                 {filteredNotes.length}
                             </span>
                             {isAdmin && (
-                                <>
+                                <div className="relative" ref={menuRef}>
                                     <button
-                                        onClick={() => setIsEditing(true)}
+                                        onClick={() => setShowActionsMenu(!showActionsMenu)}
                                         className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                        title="Edit column title"
+                                        title="Column Actions"
                                     >
-                                        <Pencil size={14} />
+                                        <MoreVertical size={16} />
                                     </button>
-                                    <button
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        title="Delete column"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </>
+
+                                    {showActionsMenu && (
+                                        <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                            {/* Color Picker Sub-item */}
+                                            <div className="px-3 py-2 border-b border-gray-50" onClick={(e) => e.stopPropagation()}>
+                                                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-2 block">Column Color</span>
+                                                <div className="grid grid-cols-4 gap-1">
+                                                    {COLUMN_COLORS.map((colorOption) => (
+                                                        <button
+                                                            key={colorOption.id}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onUpdateColumn(column.id, {
+                                                                    color: colorOption.color,
+                                                                    titleColor: colorOption.titleColor
+                                                                });
+                                                                setShowActionsMenu(false);
+                                                            }}
+                                                            className={`w-6 h-6 rounded-lg ${colorOption.previewColor} border border-whiteShadow hover:scale-110 transition-transform`}
+                                                            title={colorOption.id}
+                                                            style={{
+                                                                boxShadow: column.color === colorOption.color ? '0 0 0 2px #fff, 0 0 0 4px #e2e8f0' : 'none'
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => {
+                                                    setIsEditing(true);
+                                                    setShowActionsMenu(false);
+                                                }}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors"
+                                            >
+                                                <Pencil size={14} /> Edit Title
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    setShowDeleteConfirm(true);
+                                                    setShowActionsMenu(false);
+                                                }}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-rose-500 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                            >
+                                                <Trash2 size={14} /> Delete Column
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </>
