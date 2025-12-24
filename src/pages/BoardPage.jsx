@@ -16,6 +16,7 @@ import { useToast } from '../components/Toast';
 import { useBoard, COLUMN_COLORS } from '../store/useBoard';
 
 import BoardAudioManager from '../components/Board/BoardAudioManager';
+import AnimatedBackground from '../components/AnimatedBackground';
 
 const DraggableColumn = ({ column, isMobileAndHidden, className, children, onDragStart, onDragEnd }) => {
     const dragControls = useDragControls();
@@ -88,6 +89,7 @@ const BoardPage = () => {
         deleteColumn,
         addNote,
         updateNote,
+        updateNoteColor,
         deleteNote,
         voteNote,
         reactNote,
@@ -240,21 +242,49 @@ const BoardPage = () => {
                 return;
             }
 
-            const ws = XLSX.utils.json_to_sheet(exportData);
-            const colWidths = [
+            // Sheet 1: Board Summary
+            const summaryData = [
+                ['Board Name', boardName || 'N/A'],
+                ['Board ID', boardId],
+                ['Export Date', new Date().toLocaleString()],
+                ['Total Notes', exportData.length],
+                ['Total Members', allMembers ? Object.keys(allMembers).length : 0]
+            ];
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+            wsSummary['!cols'] = [{ wch: 20 }, { wch: 50 }];
+
+            // Sheet 2: Notes
+            const wsNotes = XLSX.utils.json_to_sheet(exportData);
+            wsNotes['!cols'] = [
                 { wch: 20 }, { wch: 50 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 40 }
             ];
-            ws['!cols'] = colWidths;
+
+            // Sheet 3: Team Members
+            const memberData = allMembers ? Object.values(allMembers)
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .map(m => ({
+                    'Name': m.name || 'Anonymous',
+                    'Join Time': m.joinedAt ? new Date(m.joinedAt).toLocaleString() : 'N/A',
+                    'Last Seen': m.lastSeen ? new Date(m.lastSeen).toLocaleString() : 'N/A',
+                    'Status': onlineUsers.some(u => u.id === m.id) ? 'Online' : 'Offline'
+                })) : [];
+
+            const wsMembers = XLSX.utils.json_to_sheet(memberData);
+            wsMembers['!cols'] = [{ wch: 30 }, { wch: 25 }, { wch: 25 }, { wch: 15 }];
+            wsMembers['!rows'] = [{ hpt: 25 }]; // Add some height to header
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Retro Board");
+            XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+            XLSX.utils.book_append_sheet(wb, wsNotes, "Notes");
+            XLSX.utils.book_append_sheet(wb, wsMembers, "Team Members");
+
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const nameToUse = boardName || 'Retro-Board';
             const safeName = nameToUse.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             XLSX.writeFile(wb, `${safeName}_${timestamp}.xlsx`);
             setShowExportMenu(false);
-            toast.success('Exported to Excel!');
+            toast.success('Exported to Excel with 3 sheets!');
         } catch (err) {
             console.error('Export failed', err);
             toast.error('Failed to export to Excel');
@@ -289,6 +319,21 @@ const BoardPage = () => {
                 csvRows.push(values.join(','));
             });
 
+            // Add Team Members Section with clear delimiter
+            if (allMembers && Object.keys(allMembers).length > 0) {
+                csvRows.push('\n');
+                csvRows.push('-------------------------------------------');
+                csvRows.push('JOINED TEAM MEMBERS');
+                csvRows.push('-------------------------------------------');
+                csvRows.push('Name,Join Time,Last Seen,Status');
+                Object.values(allMembers)
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                    .forEach(m => {
+                        const status = onlineUsers.some(u => u.id === m.id) ? 'Online' : 'Offline';
+                        csvRows.push(`"${m.name}","${new Date(m.joinedAt).toLocaleString()}","${new Date(m.lastSeen).toLocaleString()}","${status}"`);
+                    });
+            }
+
             const csvString = csvRows.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
@@ -302,7 +347,7 @@ const BoardPage = () => {
             a.click();
             window.URL.revokeObjectURL(url);
             setShowExportMenu(false);
-            toast.success('Exported to CSV!');
+            toast.success('Exported to CSV with Team Members!');
         } catch (err) {
             console.error('CSV export failed', err);
             toast.error('Failed to export to CSV');
@@ -324,17 +369,22 @@ const BoardPage = () => {
 
             const doc = new jsPDF();
 
-            // Header
-            doc.setFontSize(22);
-            doc.setTextColor(41, 128, 185); // Blue color
-            doc.text(boardName, 14, 20);
+            // Branded Header (Similar to App Header)
+            doc.setFontSize(24);
+            doc.setTextColor(41, 128, 185); // Blue theme
+            doc.text("CrispRetro", 14, 22);
 
             doc.setFontSize(10);
             doc.setTextColor(100);
-            doc.text(`Board ID: ${boardId}`, 14, 28);
-            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
+            doc.text(`Report for: ${boardName}`, 14, 30);
+            doc.text(`Exported by: ${currentUser}`, 14, 35);
+            doc.text(`Date: ${new Date().toLocaleString()}`, 14, 40);
 
-            let lastY = 45;
+            // Divider line
+            doc.setDrawColor(200);
+            doc.line(14, 45, 196, 45);
+
+            let lastY = 55;
 
             // Group notes by column for better display
             sortedColumns.forEach(column => {
@@ -393,31 +443,31 @@ const BoardPage = () => {
             });
 
             // Add Team Members Page
-            if (showUserList && allMembers) { // Only if we avail list
-                // Actually, requirement says "add the members who ever joined in the board as Joined Team member list in the report"
-                // So we should always add it if data exists
-            }
-
             if (allMembers && Object.keys(allMembers).length > 0) {
                 doc.addPage();
                 doc.setFontSize(16);
                 doc.setTextColor(41, 128, 185);
                 doc.text("Joined Team Members", 14, 20);
 
+                // Reset text color for table
+                doc.setTextColor(0);
+
                 const memberData = Object.values(allMembers)
                     .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                     .map(m => [
                         m.name || 'Anonymous',
-                        m.joinedAt ? new Date(m.joinedAt).toLocaleString() : 'Unknown',
-                        m.lastSeen ? new Date(m.lastSeen).toLocaleString() : 'Unknown'
+                        m.joinedAt ? new Date(m.joinedAt).toLocaleString() : 'N/A',
+                        m.lastSeen ? new Date(m.lastSeen).toLocaleString() : 'N/A',
+                        onlineUsers.some(u => u.id === m.id) ? 'Online' : 'Offline'
                     ]);
 
                 autoTable(doc, {
                     startY: 25,
-                    head: [['Name', 'Joined Time', 'Last Seen']],
+                    head: [['Name', 'Join Time', 'Last Seen', 'Status']],
                     body: memberData,
                     theme: 'striped',
-                    headStyles: { fillColor: [41, 128, 185] },
+                    headStyles: { fillColor: [41, 128, 185] }, // Match board theme blue
+                    styles: { fontSize: 10, cellPadding: 3 }
                 });
 
                 // Add total member count
@@ -458,7 +508,13 @@ const BoardPage = () => {
                     title: column.title,
                     color: column.color,
                     notes: Object.values(notes).filter(n => n.columnId === column.id)
-                }))
+                })),
+                teamMembers: allMembers ? Object.values(allMembers).map(m => ({
+                    name: m.name,
+                    joinedAt: m.joinedAt,
+                    lastSeen: m.lastSeen,
+                    isOnline: onlineUsers.some(u => u.id === m.id)
+                })) : []
             };
 
             const jsonString = JSON.stringify(exportData, null, 2);
@@ -520,76 +576,22 @@ const BoardPage = () => {
                 showControls={false}
             />
 
-            <BoardAudioManager
-                ref={audioManagerRef}
-                music={music}
-                timer={timer}
-                musicVolume={musicVolume}
-                timerVolume={timerVolume}
-                onUpdateTimer={updateTimer}
-                onUpdateMusic={updateMusic}
-                onAudioBlocked={setAudioBlocked}
-                isAdmin={isAdmin}
-            />
+            {isAdmin && (
+                <BoardAudioManager
+                    ref={audioManagerRef}
+                    music={music}
+                    timer={timer}
+                    musicVolume={musicVolume}
+                    timerVolume={timerVolume}
+                    onUpdateTimer={updateTimer}
+                    onUpdateMusic={updateMusic}
+                    onAudioBlocked={setAudioBlocked}
+                    isAdmin={isAdmin}
+                />
+            )}
 
-            {/* Animated Background - Pleasant Bubbles */}
-            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-gradient-to-br from-slate-200 via-blue-100 to-indigo-200">
-                {/* Floating Crisp Bubbles */}
-                <div className="absolute inset-0 opacity-60">
-                    {[...Array(15)].map((_, i) => (
-                        <div
-                            key={i}
-                            className="absolute rounded-full border-2 border-blue-400/40 bg-blue-300/10 animate-float"
-                            style={{
-                                width: Math.random() * 80 + 30 + 'px',
-                                height: Math.random() * 80 + 30 + 'px',
-                                left: Math.random() * 100 + '%',
-                                bottom: -100 + 'px',
-                                animationDelay: Math.random() * 5 + 's',
-                                animationDuration: Math.random() * 15 + 15 + 's',
-                            }}
-                        />
-                    ))}
-                </div>
-
-                {/* Gentle Wave Effect */}
-                <div className="absolute bottom-0 left-0 right-0 h-1/3 opacity-60">
-                    <div className="absolute bottom-0 left-0 w-[200%] h-full bg-gradient-to-t from-blue-300/30 via-blue-200/10 to-transparent animate-wave"
-                        style={{ transform: 'translate3d(0,0,0)' }}></div>
-                    <div className="absolute bottom-0 left-0 w-[200%] h-3/4 bg-gradient-to-t from-indigo-300/20 via-purple-200/10 to-transparent animate-wave-slow"
-                        style={{ transform: 'translate3d(0,0,0)', animationDelay: '-5s' }}></div>
-                </div>
-            </div>
-
-            <style>{`
-                @keyframes float {
-                    0% { transform: translateY(0) translateX(0); opacity: 0; }
-                    10% { opacity: 1; }
-                    90% { opacity: 1; }
-                    100% { transform: translateY(-110vh) translateX(20px); opacity: 0; }
-                }
-                @keyframes wave {
-                    0% { transform: translateX(0); }
-                    50% { transform: translateX(-50%); }
-                    100% { transform: translateX(0); }
-                }
-                @keyframes wave-slow {
-                    0% { transform: translateX(-50%); }
-                    50% { transform: translateX(0); }
-                    100% { transform: translateX(-50%); }
-                }
-                .animate-float {
-                    animation-name: float;
-                    animation-timing-function: ease-in-out;
-                    animation-iteration-count: infinite;
-                }
-                .animate-wave {
-                    animation: wave 20s ease-in-out infinite;
-                }
-                .animate-wave-slow {
-                    animation: wave-slow 30s ease-in-out infinite;
-                }
-            `}</style>
+            {/* Animated Background */}
+            <AnimatedBackground />
 
             {/* Onboarding Tour - Different steps for admin vs user */}
             <Tour
@@ -602,12 +604,14 @@ const BoardPage = () => {
                 {/* === MOBILE HEADER (Single Line) === */}
                 <div className="md:hidden flex items-center justify-between p-3 bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-100 mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"
-                        >
-                            <ArrowLeft size={20} />
-                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={() => navigate('/')}
+                                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+                        )}
                         <h1 className="text-xl font-bold text-gray-800 truncate">{boardName}</h1>
                         <div className={`w-2 h-2 rounded-full ${isFirebaseReady ? 'bg-green-500' : 'bg-orange-500'} shadow-sm`} title={isFirebaseReady ? "Live" : "Local Mode"}></div>
                     </div>
@@ -663,16 +667,20 @@ const BoardPage = () => {
                                         audioBlocked={audioBlocked}
                                         onResumeAudio={handleResumeAudio}
                                     />
-                                    <div className="h-px bg-gray-200"></div>
-                                    <MusicPlayer
-                                        music={music}
-                                        isAdmin={isAdmin}
-                                        onUpdateMusic={updateMusic}
-                                        volume={musicVolume}
-                                        onVolumeChange={setMusicVolume}
-                                        audioBlocked={audioBlocked}
-                                        onResumeAudio={handleResumeAudio}
-                                    />
+                                    {isAdmin && (
+                                        <>
+                                            <div className="h-px bg-gray-200"></div>
+                                            <MusicPlayer
+                                                music={music}
+                                                isAdmin={isAdmin}
+                                                onUpdateMusic={updateMusic}
+                                                volume={musicVolume}
+                                                onVolumeChange={setMusicVolume}
+                                                audioBlocked={audioBlocked}
+                                                onResumeAudio={handleResumeAudio}
+                                            />
+                                        </>
+                                    )}
 
                                 </div>
                             </div>
@@ -755,16 +763,18 @@ const BoardPage = () => {
 
 
                 {/* === DESKTOP HEADER (Hidden on Mobile) === */}
-                <div className="hidden md:flex flex-col gap-4 mb-6">
+                <div className="hidden md:flex flex-col gap-1 mb-1">
                     {/* Top Row: Title & Main Info */}
-                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-2">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <button
-                                onClick={() => navigate('/')}
-                                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors flex-shrink-0"
-                            >
-                                <ArrowLeft size={20} />
-                            </button>
+                            {isAdmin && (
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors flex-shrink-0"
+                                >
+                                    <ArrowLeft size={20} />
+                                </button>
+                            )}
 
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <input
@@ -860,11 +870,11 @@ const BoardPage = () => {
                         )}
                     </div>
 
-                    {/* Unified Toolbar - Visible to ALL Users */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/60 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm relative z-50">
-                        {/* Session Controls Group (Timer, Music, Poll) */}
-                        <div className="flex flex-nowrap items-center justify-center sm:justify-start gap-2 w-full sm:w-auto">
-                            <div className="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200/50">
+                    {/* Unified Toolbar - Precision Balanced (Auto-wraps elegantly at high zoom) */}
+                    <div className="flex flex-row flex-wrap lg:flex-nowrap items-center justify-between gap-1 lg:gap-2 bg-white/60 backdrop-blur-md p-1 rounded-2xl border border-white/50 shadow-sm relative z-50">
+                        {/* 1. Session Controls Group (Fixed) */}
+                        <div className="flex flex-nowrap items-center justify-start gap-1 shrink-0">
+                            <div className="flex items-center gap-0.5 bg-gray-100/50 p-0.5 rounded-xl border border-gray-200/50">
                                 <Timer
                                     timer={timer}
                                     isAdmin={isAdmin}
@@ -874,17 +884,20 @@ const BoardPage = () => {
                                     audioBlocked={audioBlocked}
                                     onResumeAudio={handleResumeAudio}
                                 />
-                                <div className="w-px h-6 bg-gray-300 mx-1"></div>
-                                <MusicPlayer
-                                    music={music}
-                                    isAdmin={isAdmin}
-                                    onUpdateMusic={updateMusic}
-                                    volume={musicVolume}
-                                    onVolumeChange={setMusicVolume}
-                                    audioBlocked={audioBlocked}
-                                    onResumeAudio={handleResumeAudio}
-                                />
-                                <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                                {isAdmin && (
+                                    <>
+                                        <MusicPlayer
+                                            music={music}
+                                            isAdmin={isAdmin}
+                                            onUpdateMusic={updateMusic}
+                                            volume={musicVolume}
+                                            onVolumeChange={setMusicVolume}
+                                            audioBlocked={audioBlocked}
+                                            onResumeAudio={handleResumeAudio}
+                                        />
+                                    </>
+                                )}
+                                {!isAdmin && <div className="hidden"></div>}
                                 <Poll
                                     polls={polls}
                                     activePoll={activePoll}
@@ -897,74 +910,72 @@ const BoardPage = () => {
                                     showActivePoll={false}
                                 />
                             </div>
-
                         </div>
 
-                        {/* Utilities Group (Search, Invite, Export) */}
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <div className="relative flex-1 sm:flex-none">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-9 pr-3 h-[46px] bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-full sm:w-48 transition-all shadow-sm"
-                                />
-                            </div>
+                        {/* 2. Search Box (Trigger Element - Forces wrap at high zoom) */}
+                        <div className="relative flex-grow min-w-[150px] max-w-[180px] mx-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input
+                                type="text"
+                                placeholder="Search..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-8 pr-3 h-8 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-full transition-all shadow-sm"
+                            />
+                        </div>
 
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleShare}
-                                    className="flex items-center gap-2 h-[46px] bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 rounded-xl border border-transparent transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
-                                >
-                                    <Share2 size={16} />
-                                    <span className="hidden sm:inline">Invite</span>
-                                </button>
+                        {/* 3. Action Buttons Group (Fixed) */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button
+                                onClick={handleShare}
+                                className="flex items-center gap-2 h-8 bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 rounded-xl border border-transparent transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
+                            >
+                                <Share2 size={16} />
+                                <span className="hidden sm:inline">Invite</span>
+                            </button>
 
-                                {/* Export - Admin Only */}
-                                {isAdmin && (
-                                    <div className="relative" ref={exportMenuRef}>
-                                        <button
-                                            onClick={() => setShowExportMenu(!showExportMenu)}
-                                            className="flex items-center gap-2 h-[46px] bg-gray-900 hover:bg-black text-white px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
-                                        >
-                                            <Download size={16} />
-                                            <span className="hidden lg:inline">Export</span>
-                                            <ChevronDown size={14} />
-                                        </button>
-                                        {showExportMenu && (
-                                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                                <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Export As</div>
-                                                <button onClick={handleExportExcel} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
-                                                    <span>📊</span> Excel
-                                                </button>
-                                                <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
-                                                    <span>📄</span> CSV
-                                                </button>
-                                                <button onClick={handleExportPDF} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
-                                                    <span>📑</span> PDF
-                                                </button>
-                                                <button onClick={handleExportJSON} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
-                                                    <span>🔧</span> JSON
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Clear Board - Admin Only */}
-                                {isAdmin && (
+                            {/* Export - Admin Only */}
+                            {isAdmin && (
+                                <div className="relative" ref={exportMenuRef}>
                                     <button
-                                        onClick={handleClearBoard}
-                                        className="flex items-center gap-2 h-[46px] bg-red-50 hover:bg-red-100 text-red-600 px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap border border-red-100"
-                                        title="Clear all notes"
+                                        onClick={() => setShowExportMenu(!showExportMenu)}
+                                        className="flex items-center gap-2 h-8 bg-gray-900 hover:bg-black text-white px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
                                     >
-                                        <Trash2 size={16} />
-                                        <span className="hidden lg:inline">Clear Board</span>
+                                        <Download size={16} />
+                                        <span className="hidden lg:inline">Export</span>
+                                        <ChevronDown size={14} />
                                     </button>
-                                )}
-                            </div>
+                                    {showExportMenu && (
+                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                            <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Export As</div>
+                                            <button onClick={handleExportExcel} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                <span>📊</span> Excel
+                                            </button>
+                                            <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                <span>📄</span> CSV
+                                            </button>
+                                            <button onClick={handleExportPDF} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                <span>📑</span> PDF
+                                            </button>
+                                            <button onClick={handleExportJSON} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 transition-colors flex items-center gap-2 text-sm">
+                                                <span>🔧</span> JSON
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Clear Board - Admin Only */}
+                            {isAdmin && (
+                                <button
+                                    onClick={handleClearBoard}
+                                    className="flex items-center gap-2 h-[42px] bg-red-50 hover:bg-red-100 text-red-600 px-3 rounded-xl transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap border border-red-100"
+                                    title="Clear all notes"
+                                >
+                                    <Trash2 size={16} />
+                                    <span className="hidden lg:inline">Clear Board</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1024,6 +1035,7 @@ const BoardPage = () => {
                                                 notes={getNotesByColumn(column.id)}
                                                 onAddNote={handleAddNote}
                                                 onUpdateNote={updateNote}
+                                                onUpdateNoteColor={updateNoteColor}
                                                 onDeleteNote={deleteNote}
                                                 onVoteNote={voteNote}
                                                 onReactNote={reactNote}

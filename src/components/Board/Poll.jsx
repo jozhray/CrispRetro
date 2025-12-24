@@ -74,13 +74,21 @@ const Poll = ({
     const safePolls = polls || {};
     const sortedPolls = Object.values(safePolls).sort((a, b) => (b?.createdAt || 0) - (a?.createdAt || 0));
 
+    // Can create a poll if no active poll exists
+    const canCreate = !activePoll;
+
     return (
         <div className="relative">
             {/* Create Poll Button - Admin Only */}
             {showControls && isAdmin && (
                 <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-2 h-[46px] px-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl font-medium transition-all shadow-md hover:shadow-lg"
+                    onClick={() => (canCreate ? setShowCreateModal(true) : null)}
+                    disabled={!canCreate}
+                    className={`flex items-center gap-2 h-8 px-3 rounded-xl font-medium transition-all shadow-md hover:shadow-lg whitespace-nowrap text-sm ${canCreate
+                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                        }`}
+                    title={!canCreate ? "A poll is already active" : "Create a new poll"}
                 >
                     <BarChart3 size={18} />
                     <span className="hidden sm:inline">Create Poll</span>

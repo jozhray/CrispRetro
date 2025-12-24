@@ -62,7 +62,7 @@ const MusicPlayer = ({
     };
 
     return (
-        <div className="relative flex items-center gap-3 bg-gradient-to-r from-purple-900 to-indigo-900 px-4 py-2 rounded-xl shadow-lg h-[46px]">
+        <div className="relative flex items-center gap-2 bg-gradient-to-r from-purple-900 to-indigo-900 px-2.5 rounded-lg shadow-lg h-8">
             {audioBlocked && music.isPlaying && (
                 <div
                     onClick={onResumeAudio}
@@ -87,7 +87,7 @@ const MusicPlayer = ({
                     </select>
                     <button
                         onClick={togglePlay}
-                        className={`text-xs font-medium px-3 py-1 rounded-lg transition-all ${music.isPlaying
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded transition-all ${music.isPlaying
                             ? 'bg-purple-500 text-white'
                             : 'bg-purple-700 text-purple-200 hover:bg-purple-600'
                             }`}
@@ -105,13 +105,13 @@ const MusicPlayer = ({
             <div className="relative" ref={volumeRef}>
                 <button
                     onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-                    className={`p-1.5 rounded-lg transition-all ${volume === 0
+                    className={`p-1 rounded transition-all ${volume === 0
                         ? 'bg-red-500/20 text-red-400'
                         : 'bg-purple-700/50 hover:bg-purple-600/50 text-purple-300'
                         }`}
                     title="Music Volume"
                 >
-                    <Volume2 size={14} />
+                    <Volume2 size={12} />
                 </button>
 
                 {showVolumeSlider && (

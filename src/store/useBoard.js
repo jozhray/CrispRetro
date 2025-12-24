@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { database } from '../firebase';
-import { ref, onValue, set, update, remove, runTransaction, onDisconnect } from 'firebase/database';
+import { ref, onValue, set, update, remove, runTransaction, onDisconnect, get } from 'firebase/database';
 import { useToast } from '../components/Toast';
+import { sanitizeEmail } from '../services/userService';
 
 // Default columns for new boards
 const DEFAULT_COLUMNS = {
@@ -38,7 +39,45 @@ export const useBoard = (boardId) => {
 
     const currentUser = localStorage.getItem('crisp_user_name');
     const currentUserId = localStorage.getItem('crisp_user_id');
-    const isAdmin = currentUserId === adminId;
+    const userEmail = localStorage.getItem('crisp_user_email');
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    // Permission & Self-Healing Logic
+    useEffect(() => {
+        if (!boardId || !currentUserId) {
+            setIsAdmin(false);
+            return;
+        }
+
+        // 1. Direct match with adminId on board
+        if (currentUserId === adminId) {
+            setIsAdmin(true);
+            return;
+        }
+
+        // 2. Check Ownership in User History (Self-Healing)
+        if (userEmail && database) {
+            const sanitizedEmail = sanitizeEmail(userEmail);
+            const historyRef = ref(database, `users/${sanitizedEmail}/boards/${boardId}`);
+
+            get(historyRef).then(snapshot => {
+                if (snapshot.exists()) {
+                    const historyData = snapshot.val();
+                    if (historyData.role === 'owner') {
+                        console.log("Self-healing: Ownership verified via history.");
+                        setIsAdmin(true);
+
+                        // If board's adminId is a UUID but we have a persistent ID, update the board
+                        const isOriginalAdminUUID = adminId && adminId.length > 20 && adminId.includes('-');
+                        if (isOriginalAdminUUID || !adminId) {
+                            console.log("Self-healing: Updating board adminId to persistent ID.");
+                            update(ref(database, `boards/${boardId}`), { adminId: currentUserId });
+                        }
+                    }
+                }
+            });
+        }
+    }, [boardId, currentUserId, adminId, userEmail]);
 
     // Check if Firebase is available
     useEffect(() => {
@@ -281,7 +320,8 @@ export const useBoard = (boardId) => {
             votes: 0,
             order: maxOrder + 1,
             createdAt: Date.now(),
-            columnId
+            columnId,
+            color: '#ffffff' // Default white
         };
 
         setNotes(prev => {
@@ -292,8 +332,21 @@ export const useBoard = (boardId) => {
     }, [notes, saveData]);
 
     const updateNote = useCallback((noteId, content) => {
+        if (typeof content !== 'string') {
+            console.error("Attempted to update note with non-string content:", content);
+            return;
+        }
         setNotes(prev => {
             const updatedNotes = { ...prev, [noteId]: { ...prev[noteId], content } };
+            saveData({ notes: updatedNotes });
+            return updatedNotes;
+        });
+    }, [saveData]);
+
+    const updateNoteColor = useCallback((noteId, color) => {
+        setNotes(prev => {
+            if (!prev[noteId]) return prev;
+            const updatedNotes = { ...prev, [noteId]: { ...prev[noteId], color } };
             saveData({ notes: updatedNotes });
             return updatedNotes;
         });
@@ -635,6 +688,7 @@ export const useBoard = (boardId) => {
         deleteColumn,
         addNote,
         updateNote,
+        updateNoteColor,
         deleteNote,
         voteNote,
         reactNote,

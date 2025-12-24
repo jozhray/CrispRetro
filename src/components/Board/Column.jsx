@@ -39,6 +39,7 @@ const Column = ({
     notes,
     onAddNote,
     onUpdateNote,
+    onUpdateNoteColor,
     onDeleteNote,
     onVoteNote,
     onReactNote,
@@ -68,15 +69,17 @@ const Column = ({
         .filter(note => {
             if (!searchQuery) return true;
             const query = searchQuery.toLowerCase();
+            const content = typeof note.content === 'string' ? note.content.toLowerCase() : '';
+            const author = typeof note.author === 'string' ? note.author.toLowerCase() : '';
             return (
-                note.content.toLowerCase().includes(query) ||
-                note.author.toLowerCase().includes(query)
+                content.includes(query) ||
+                author.includes(query)
             );
         })
         .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
 
     const handleDragOver = (e) => {
-        if (!isAdmin) return;
+        // Allow drag over for anyone - validation happens on drop
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         setIsDragOver(true);
@@ -89,13 +92,20 @@ const Column = ({
     };
 
     const handleDrop = (e) => {
-        if (!isAdmin) return;
         e.preventDefault();
         setIsDragOver(false);
 
         const noteId = e.dataTransfer.getData('noteId');
+        const noteAuthorId = e.dataTransfer.getData('authorId');
+
         if (noteId) {
-            onMoveNote(noteId, column.id);
+            // Check if user is admin or owner of the note
+            // We use the passed authorId for cross-column drops where 'note' lookup might fail
+            const isOwner = noteAuthorId === currentUserId;
+
+            if (isAdmin || isOwner) {
+                onMoveNote(noteId, column.id);
+            }
         }
     };
 
@@ -245,7 +255,7 @@ const Column = ({
             {(() => {
                 const hasMyEmptyNote = notes.some(note =>
                     note.authorId === currentUserId &&
-                    (!note.content || note.content.trim() === '')
+                    (!note.content || typeof note.content !== 'string' || note.content.trim() === '')
                 );
                 return (
                     <button
@@ -274,7 +284,7 @@ const Column = ({
                 <Reorder.Group
                     axis="y"
                     values={filteredNotes}
-                    onReorder={(newOrder) => isAdmin && onReorderNotes(column.id, newOrder.map(n => n.id))}
+                    onReorder={(newOrder) => onReorderNotes(column.id, newOrder.map(n => n.id))}
                     className="space-y-3"
                 >
                     {filteredNotes.map(note => (
@@ -291,7 +301,10 @@ const Column = ({
                                 document.body.classList.remove('is-dragging');
                                 setIsNoteDragging(false);
                                 if (onDragEnd) onDragEnd();
-                                if (!isAdmin) return;
+
+                                const isOwner = note.authorId === currentUserId;
+                                if (!isAdmin && !isOwner) return;
+
                                 const elements = document.elementsFromPoint(info.point.x, info.point.y);
                                 const targetColumn = elements.find(el => el.hasAttribute('data-column-id'));
                                 if (targetColumn) {
@@ -306,6 +319,7 @@ const Column = ({
                             <NoteCard
                                 note={note}
                                 onUpdate={onUpdateNote}
+                                onUpdateColor={onUpdateNoteColor}
                                 onDelete={onDeleteNote}
                                 onVote={onVoteNote}
                                 onReact={onReactNote}

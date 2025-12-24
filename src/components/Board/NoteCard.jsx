@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ThumbsUp, Trash2, User, GripVertical, MessageSquare, Send, Edit2, X, Check } from 'lucide-react';
+import { ThumbsUp, Trash2, User, GripVertical, MessageSquare, Send, Edit2, X, Check, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, isAdmin, dragControls }) => {
+const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, isAdmin, dragControls }) => {
     const cardRef = useRef(null);
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
@@ -12,6 +12,34 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editContent, setEditContent] = useState("");
     const [isVoting, setIsVoting] = useState(false); // Prevent double-clicks
+    const [showColorPicker, setShowColorPicker] = useState(false);
+
+    const NOTE_COLORS = [
+        { id: 'white', value: '#ffffff', label: 'White' },
+        { id: 'yellow', value: '#fff9c4', label: 'Yellow' },
+        { id: 'blue', value: '#e3f2fd', label: 'Blue' },
+        { id: 'green', value: '#e8f5e9', label: 'Green' },
+        { id: 'red', value: '#ffebee', label: 'Red' },
+        { id: 'purple', value: '#f3e5f5', label: 'Purple' },
+        { id: 'orange', value: '#fff3e0', label: 'Orange' },
+        { id: 'gray', value: '#f5f5f5', label: 'Gray' },
+        { id: 'cyan', value: '#e0f7fa', label: 'Cyan' },
+        { id: 'pink', value: '#fce4ec', label: 'Pink' },
+    ];
+
+    const getContrastColor = (hexValue) => {
+        if (!hexValue || hexValue === 'transparent') return 'text-gray-700';
+        // Convert hex to RGB
+        const r = parseInt(hexValue.slice(1, 3), 16);
+        const g = parseInt(hexValue.slice(3, 5), 16);
+        const b = parseInt(hexValue.slice(5, 7), 16);
+        // Calculate luminance
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.6 ? 'text-gray-800' : 'text-white';
+    };
+
+    const contrastTextColor = getContrastColor(note.color || '#ffffff');
+    const isDarkBackground = contrastTextColor === 'text-white';
     const canDelete = isAdmin || (note.authorId && note.authorId === currentUserId);
 
     // Check if current user has voted
@@ -48,7 +76,7 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
     }, [note.votes]);
 
     // Check if note has content
-    const hasContent = note.content && note.content.trim().length > 0;
+    const hasContent = note.content && typeof note.content === 'string' && note.content.trim().length > 0;
 
     const handleVote = () => {
         if (!hasContent) return;
@@ -61,12 +89,15 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
         onVote(note.id);
     };
 
+    const canMove = isAdmin || (note.authorId && note.authorId === currentUserId);
+
     const handleDragStart = (e) => {
-        if (!isAdmin) {
+        if (!canMove) {
             e.preventDefault();
             return;
         }
         e.dataTransfer.setData('noteId', note.id);
+        e.dataTransfer.setData('authorId', note.authorId);
         e.dataTransfer.effectAllowed = 'move';
         setTimeout(() => {
             e.target.style.opacity = '0.5';
@@ -126,7 +157,8 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className={`bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:shadow-md transition-shadow relative overflow-hidden ${isAdmin ? 'cursor-default' : ''}`}
+            style={{ backgroundColor: note.color || '#ffffff' }}
+            className={`p-4 rounded-xl shadow-sm border border-gray-100 group hover:shadow-md transition-all relative overflow-hidden ${!canMove ? 'cursor-default' : ''}`}
         >
             {/* Floating thumbs up animation */}
             <AnimatePresence>
@@ -164,8 +196,8 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
             </AnimatePresence>
 
             <div className="flex gap-2">
-                {/* Drag handle - Admin only */}
-                {isAdmin && (
+                {/* Drag handle - Admin or Owner */}
+                {canMove && (
                     <div
                         className="flex-shrink-0 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity pt-0.5 touch-none"
                         onPointerDown={(e) => dragControls?.start(e)}
@@ -179,16 +211,17 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
                         ref={textareaRef}
                         value={note.content}
                         onChange={(e) => onUpdate(note.id, e.target.value)}
-                        className="w-full resize-none outline-none text-gray-700 bg-transparent placeholder-gray-400"
+                        className={`w-full resize-none outline-none bg-transparent placeholder-gray-400 ${contrastTextColor}`}
+                        style={{ color: isDarkBackground ? '#ffffff' : undefined }}
                         placeholder="Type your thought..."
                         rows={1}
-                        readOnly={!canDelete && note.content.length > 0}
+                        readOnly={!canDelete && typeof note.content === 'string' && note.content.length > 0}
                     />
                 </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-gray-500 mt-3 pt-3 border-t border-gray-50">
-                <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-full">
+            <div className={`flex items-center justify-between text-xs mt-3 pt-3 border-t ${isDarkBackground ? 'border-white/10 text-white/70' : 'border-gray-50 text-gray-500'}`}>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${isDarkBackground ? 'bg-black/20' : 'bg-gray-50'}`}>
                     <User size={12} />
                     <span className="font-medium truncate max-w-[100px]">{note.author}</span>
                 </div>
@@ -199,10 +232,10 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
                         onClick={() => hasContent && setShowComments(!showComments)}
                         disabled={!hasContent}
                         className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${!hasContent
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                            ? (isDarkBackground ? 'bg-white/10 text-white/30 cursor-not-allowed opacity-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50')
                             : (note.comments && Object.keys(note.comments).length > 0)
-                                ? 'bg-purple-50 text-purple-600'
-                                : 'hover:bg-gray-100 text-gray-400'
+                                ? (isDarkBackground ? 'bg-purple-900/40 text-purple-200' : 'bg-purple-50 text-purple-600')
+                                : (isDarkBackground ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-100 text-gray-400')
                             }`}
                         title={!hasContent ? "Add content to comment" : "Comments"}
                     >
@@ -215,12 +248,12 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
                         whileTap={hasContent ? { scale: 0.9 } : {}}
                         disabled={!hasContent}
                         className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${!hasContent
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                            ? (isDarkBackground ? 'bg-white/10 text-white/30 cursor-not-allowed opacity-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50')
                             : hasVoted
-                                ? 'bg-blue-100 text-blue-600 ring-1 ring-blue-300'
+                                ? (isDarkBackground ? 'bg-blue-600/40 text-blue-200 ring-1 ring-blue-500/50' : 'bg-blue-100 text-blue-600 ring-1 ring-blue-300')
                                 : note.votes > 0
-                                    ? 'bg-blue-50 text-blue-600'
-                                    : 'hover:bg-gray-100'
+                                    ? (isDarkBackground ? 'bg-blue-900/40 text-blue-200' : 'bg-blue-50 text-blue-600')
+                                    : (isDarkBackground ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-100 text-gray-500')
                             }`}
                         title={!hasContent ? "Add content to vote" : (hasVoted ? "Click to remove your vote" : "Click to vote")}
                     >
@@ -228,22 +261,56 @@ const NoteCard = ({ note, onUpdate, onDelete, onVote, onAddComment, onUpdateComm
                             animate={showVoteAnimation ? { rotate: [0, -20, 20, -10, 10, 0], scale: [1, 1.2, 1] } : {}}
                             transition={{ duration: 0.5 }}
                         >
-                            <ThumbsUp size={14} className={hasVoted ? 'fill-blue-600' : ''} />
+                            <ThumbsUp size={14} className={hasVoted ? (isDarkBackground ? 'fill-blue-200' : 'fill-blue-600') : ''} />
                         </motion.div>
                         <span>{note.votes || 0}</span>
                     </motion.button>
 
                     {canDelete && (
-                        <button
-                            onClick={() => onDelete(note.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-all"
-                            title="Delete note"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setShowColorPicker(!showColorPicker)}
+                                className={`p-1.5 rounded-full transition-all ${isDarkBackground ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'} opacity-0 group-hover:opacity-100`}
+                                title="Change color"
+                            >
+                                <Palette size={14} />
+                            </button>
+                            <button
+                                onClick={() => onDelete(note.id)}
+                                className={`p-1.5 rounded-full transition-all ${isDarkBackground ? 'text-white/40 hover:text-red-300 hover:bg-red-900/40' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'} opacity-0 group-hover:opacity-100`}
+                                title="Delete note"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
+
+            {/* Color Picker Overlay */}
+            <AnimatePresence>
+                {showColorPicker && canDelete && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute bottom-12 right-4 z-20 bg-white shadow-xl border border-gray-100 rounded-lg p-2 flex gap-1.5 flex-wrap max-w-[200px]"
+                    >
+                        {NOTE_COLORS.map(c => (
+                            <button
+                                key={c.id}
+                                onClick={() => {
+                                    onUpdateColor(note.id, c.value);
+                                    setShowColorPicker(false);
+                                }}
+                                className={`w-6 h-6 rounded-full border border-gray-200 transition-transform hover:scale-110 ${note.color === c.value ? 'ring-2 ring-blue-400 ring-offset-1' : ''}`}
+                                style={{ backgroundColor: c.value }}
+                                title={c.label}
+                            />
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Comments Section */}
             <AnimatePresence>

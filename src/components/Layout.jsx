@@ -1,9 +1,14 @@
 import React from 'react';
+import Header from './Header';
 
 const Layout = ({ children }) => {
+    const isLoginPage = window.location.pathname === '/login';
+    const showHeader = !isLoginPage;
+
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-            <main className="container mx-auto px-4 py-8">
+            <Header />
+            <main className={`container mx-auto px-4 ${showHeader ? 'pt-12' : 'pt-4'} pb-8 relative z-10`}>
                 {children}
             </main>
         </div>

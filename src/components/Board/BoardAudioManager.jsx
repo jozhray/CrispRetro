@@ -145,8 +145,10 @@ const BoardAudioManager = forwardRef(({
         let interval;
         if (timer.isRunning && timer.timeLeft > 0) {
             interval = setInterval(() => {
-                // Play tick
-                playTimerSound('tick');
+                // Play tick (Every 5s or last 5s)
+                if (timer.timeLeft % 5 === 0 || timer.timeLeft <= 5) {
+                    playTimerSound('tick');
+                }
 
                 // Update time using function form to ensure latest state interaction isn't needed 
                 // but we typically use the prop. 
