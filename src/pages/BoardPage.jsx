@@ -675,6 +675,7 @@ const BoardPage = () => {
 
                         <div className="flex items-center gap-2">
                             <Poll
+                                id="poll-btn"
                                 polls={polls}
                                 activePoll={activePoll}
                                 isAdmin={isAdmin}
@@ -868,6 +869,7 @@ const BoardPage = () => {
                             {isAdmin && hasColumnChanges && (
                                 <div className="hidden lg:flex items-center gap-2 mr-4">
                                     <button
+                                        id="save-template-btn"
                                         onClick={() => {
                                             setTemplateName(boardName + " Template");
                                             setShowSaveTemplateModal(true);
@@ -958,7 +960,7 @@ const BoardPage = () => {
                         {/* Unified Toolbar - Precision Balanced (Auto-wraps elegantly at high zoom) */}
                         <div className="flex flex-row flex-wrap lg:flex-nowrap items-center justify-between gap-1 lg:gap-2 bg-white/60 backdrop-blur-md p-1 rounded-2xl border border-white/50 shadow-sm relative z-50">
                             {/* 1. Session Controls Group (Fixed) */}
-                            <div className="flex flex-nowrap items-center justify-start gap-1 shrink-0">
+                            <div className="flex flex-nowrap items-center justify-start gap-1 shrink-0" id="audio-controls">
                                 <div className="flex items-center gap-0.5 bg-gray-100/50 p-0.5 rounded-xl border border-gray-200/50">
                                     <Timer
                                         timer={timer}
@@ -984,6 +986,7 @@ const BoardPage = () => {
                                     )}
                                     {!isAdmin && <div className="hidden"></div>}
                                     <Poll
+                                        id="poll-btn-desktop"
                                         polls={polls}
                                         activePoll={activePoll}
                                         isAdmin={isAdmin}
@@ -1012,6 +1015,7 @@ const BoardPage = () => {
                             {/* 3. Action Buttons Group (Fixed) */}
                             <div className="flex items-center gap-1 shrink-0">
                                 <button
+                                    id="share-board-btn"
                                     onClick={handleShare}
                                     className="flex items-center gap-2 h-8 bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 rounded-xl border border-transparent transition-all shadow-sm hover:shadow text-sm font-medium whitespace-nowrap"
                                 >

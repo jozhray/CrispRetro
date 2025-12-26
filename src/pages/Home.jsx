@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Users, Sparkles, TrendingUp, ArrowRight, ArrowLeft, X, Trash2, Edit2, Check } from 'lucide-react';
 import Layout from '../components/Layout';
-import Tour, { HOME_TOUR_STEPS } from '../components/Tour';
+import Tour, { HOME_TOUR_STEPS, JOIN_TOUR_STEPS } from '../components/Tour';
 import { useToast } from '../components/Toast';
 import { database } from '../firebase';
 import { ref, set, get } from 'firebase/database';
@@ -373,8 +373,8 @@ const Home = () => {
         <Layout>
             {/* Onboarding Tour */}
             <Tour
-                steps={HOME_TOUR_STEPS}
-                storageKey="crisp_home_tour_completed"
+                steps={searchParams.get('join') ? JOIN_TOUR_STEPS : HOME_TOUR_STEPS}
+                storageKey={searchParams.get('join') ? 'crisp_join_tour_completed' : 'crisp_home_tour_completed'}
                 onComplete={handleTourComplete}
             />
             <div className="min-h-screen relative overflow-hidden">
@@ -498,7 +498,7 @@ const Home = () => {
                                                 />
 
                                                 {!boardId && (
-                                                    <div className="grid grid-cols-2 gap-2">
+                                                    <div className="grid grid-cols-2 gap-2" id="creation-modes">
                                                         <button
                                                             onClick={() => setCreationMode('default')}
                                                             className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'default' ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
@@ -506,6 +506,7 @@ const Home = () => {
                                                             Default Columns
                                                         </button>
                                                         <button
+                                                            id="custom-mode-btn"
                                                             onClick={() => setCreationMode('custom')}
                                                             className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'custom' ? 'bg-purple-500/20 border-purple-400 text-purple-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
                                                         >
@@ -515,9 +516,9 @@ const Home = () => {
                                                 )}
 
                                                 {isLoggedIn && userTemplates.length > 0 && !boardId && (
-                                                    <div className="space-y-2">
+                                                    <div className="space-y-2" id="template-section">
                                                         <label className="text-xs text-gray-500 font-medium px-1 uppercase tracking-wider">Use a Template</label>
-                                                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                                                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" id="user-templates">
                                                             {userTemplates.map(t => (
                                                                 <div key={t.id} className="relative group/template flex-shrink-0">
                                                                     {editingTemplate?.id === t.id ? (
@@ -580,6 +581,7 @@ const Home = () => {
                                             </div>
 
                                             <button
+                                                id="create-board-btn"
                                                 type="button"
                                                 onClick={() => {
                                                     if (!boardId && creationMode === 'custom') {
@@ -733,7 +735,7 @@ const Home = () => {
                                                     <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
                                                         <Clock size={14} /> Recent Boards (Last 30 Days)
                                                     </label>
-                                                    <div className="max-h-32 overflow-y-auto bg-slate-800/50 rounded-lg border border-gray-700/50 custom-scrollbar">
+                                                    <div id="recent-history" className="max-h-32 overflow-y-auto bg-slate-800/50 rounded-lg border border-gray-700/50 custom-scrollbar">
                                                         {recentBoards.map((board) => (
                                                             <div key={board.id} className="group/item flex items-center border-b border-gray-700/30 last:border-0 hover:bg-white/5">
                                                                 <button
@@ -773,6 +775,7 @@ const Home = () => {
                                                         }`}
                                                 />
                                                 <button
+                                                    id="join-board-btn"
                                                     type="submit"
                                                     disabled={!!boardName}
                                                     className={`text-white p-4 rounded-lg transition-all transform shadow-lg ${boardName

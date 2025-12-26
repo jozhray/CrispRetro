@@ -340,16 +340,67 @@ export const HOME_TOUR_STEPS = [
         target: '#user-name'
     },
     {
-        title: 'Create a Board',
-        description: 'Enter a board name and click "Create New Board" to start your retro!',
-        icon: '✨',
+        title: 'Board Name',
+        description: 'Give your retrospective a clear name to keep things organized.',
+        icon: '📝',
         target: '#board-name'
     },
     {
+        title: 'Customization',
+        description: 'Choose "Default Columns" for a standard retro, or "Custom Columns" to design your own flow!',
+        icon: '🎨',
+        target: '#creation-modes'
+    },
+    {
+        title: 'Templates',
+        description: 'Once you create custom boards, you can save them as templates to reuse later!',
+        icon: '✨',
+        target: '#template-section'
+    },
+    {
+        title: 'Recent History',
+        description: 'Quickly jump back into boards you\'ve recently visited.',
+        icon: '🕒',
+        target: '#recent-history'
+    },
+    {
+        title: 'Create Board',
+        description: 'Click here to finalize your settings and start the session!',
+        icon: '🚀',
+        target: '#create-board-btn'
+    },
+    {
         title: 'Join Existing Board',
-        description: 'Or paste a Board ID here to join your team\'s session!',
+        description: 'Joining a team? Paste the Board ID here to hop right in!',
         icon: '🤝',
         target: '#join-board'
+    }
+];
+
+// Tour steps for Joining User (Arriving via link)
+export const JOIN_TOUR_STEPS = [
+    {
+        title: 'Welcome to the Team! 👋',
+        description: 'You\'ve been invited to a retrospective. Let\'s get you set up in seconds!',
+        icon: '🙌'
+    },
+    {
+        title: 'Your Name',
+        description: 'First, enter your name. This is how your teammates will see your notes.',
+        icon: '👤',
+        target: '#user-name'
+    },
+    {
+        title: 'Board ID',
+        description: 'We\'ve pre-filled the Board ID from your invite link. Just verify it\'s here!',
+        icon: '🔑',
+        target: '#join-board'
+    },
+    {
+        title: 'Join Board',
+        description: 'Click this button to hop into the live session with your team!',
+        icon: '🚀',
+        target: '#join-board-btn'
     }
 ];
 
@@ -362,35 +413,39 @@ export const BOARD_TOUR_STEPS_ADMIN = [
     },
     {
         title: 'Board Name',
-        description: 'Click here to rename your board. Only you can edit this!',
+        description: 'Click here to rename your board anytime. Changes saved instantly!',
         icon: '📝',
         target: 'input.text-2xl'
     },
     {
         title: 'Timer & Music',
-        description: 'Set a timer for discussions and play background music!',
-        icon: '⏱️'
+        description: 'Set a focus timer and play relaxing background music for the team.',
+        icon: '🎵',
+        target: '#audio-controls'
     },
     {
         title: 'Quick Polls',
-        description: 'Create polls to gather team opinions quickly! Results are shown in real-time.',
-        icon: '📊'
-    },
-    {
-        title: 'Add & Vote',
-        description: 'Click + to add notes. Everyone can vote 👍 on ideas!',
-        icon: '✨'
+        description: 'Create real-time polls to gather team feedback on specific topics.',
+        icon: '📊',
+        target: '#poll-btn-desktop'
     },
     {
         title: 'Invite Team',
-        description: 'Share the board link to invite your teammates!',
+        description: 'Share the board link or ID to invite your teammates to join.',
         icon: '📤',
-        target: 'button:has(.lucide-share2)'
+        target: '#share-board-btn'
     },
     {
-        title: 'Export Board',
-        description: 'Download your retro as Excel, CSV, PDF or JSON!',
-        icon: '💾'
+        title: 'Save as Template',
+        description: 'Love this layout? Save your column configuration as a template for next time!',
+        icon: '✨',
+        target: '#save-template-btn'
+    },
+    {
+        title: 'Export Results',
+        description: 'Download your retro as Excel, CSV, PDF, or JSON once you\'re finished.',
+        icon: '💾',
+        target: 'button:has(.lucide-download)'
     }
 ];
 
@@ -398,33 +453,26 @@ export const BOARD_TOUR_STEPS_ADMIN = [
 export const BOARD_TOUR_STEPS_USER = [
     {
         title: 'Welcome! 🎉',
-        description: 'This is your team\'s retrospective. Here\'s what you can do!',
+        description: 'This is your team\'s retrospective. Let\'s see how you can participate!',
         icon: '🙌'
     },
     {
-        title: 'See Your Team',
-        description: 'Look for the avatars at the top - see who else is online in real-time!',
-        icon: '👥'
+        title: 'Audio Settings',
+        description: 'Adjust the volume of the timer and music to your preference.',
+        icon: '🔊',
+        target: '#audio-controls'
     },
     {
-        title: 'Add Notes',
-        description: 'Click + in any column to share your thoughts.',
-        icon: '📝'
-    },
-    {
-        title: 'Vote',
-        description: 'Click 👍 to vote on notes you agree with!',
-        icon: '🗳️'
+        title: 'Add & Vote',
+        description: 'Click + in any column to add notes, and vote 👍 on ideas you agree with!',
+        icon: '✨',
+        target: '.flex-1.flex.gap-4' // Targeting the columns area
     },
     {
         title: 'Join Polls',
-        description: 'Vote on polls created by your admin. Results show in real-time!',
-        icon: '📊'
-    },
-    {
-        title: 'Volume',
-        description: 'Adjust timer and music volume with the speaker icons.',
-        icon: '🔊'
+        description: 'Keep an eye out for polls created by your admin. Vote in real-time!',
+        icon: '🗳️',
+        target: '#poll-btn-desktop'
     }
 ];
 
