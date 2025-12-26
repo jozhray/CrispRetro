@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Users, Sparkles, TrendingUp, ArrowRight, ArrowLeft, X, Trash2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Users, Sparkles, TrendingUp, ArrowRight, ArrowLeft, X, Trash2, Edit2, Check } from 'lucide-react';
 import Layout from '../components/Layout';
 import Tour, { HOME_TOUR_STEPS } from '../components/Tour';
 import { useToast } from '../components/Toast';
@@ -23,6 +24,9 @@ const Home = () => {
     const [creationMode, setCreationMode] = useState('default'); // 'default', 'custom', 'template'
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [pendingBoardData, setPendingBoardData] = useState(null);
+    const [templateName, setTemplateName] = useState('');
+    const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState(null); // { id: string, name: string }
     const [itemToDelete, setItemToDelete] = useState(null); // { type: 'template' | 'history', id: string, name: string }
     const [customColumns, setCustomColumns] = useState([
         { id: '1', title: 'What went Well', color: 'bg-green-50 border-green-200', titleColor: 'text-green-900' },
@@ -211,9 +215,23 @@ const Home = () => {
         // So we should handle that transition.
 
         if (creationMode === 'custom' && creationStep === 2) {
-            setPendingBoardData({ id: newBoardId, data: initialData });
-            setCreationStep(3); // Move to template prompt
-            setBoardId(newBoardId);
+            // If saveAsTemplate is toggled, save it first
+            if (saveAsTemplate) {
+                const userEmail = localStorage.getItem('crisp_user_email');
+                const tName = templateName.trim() || (boardName + " Template");
+                await userService.saveTemplate(userEmail, {
+                    name: tName,
+                    columns: customColumns.map((c, i) => ({
+                        id: `col-${i}`,
+                        title: c.title,
+                        color: c.color,
+                        titleColor: c.titleColor,
+                        order: i
+                    }))
+                });
+                toast.success(`Template "${tName}" saved!`);
+            }
+            await finalizeBoardCreation(newBoardId, initialData);
             return;
         }
 
@@ -243,26 +261,6 @@ const Home = () => {
         navigate(`/board/${newBoardId}`);
     };
 
-    const handleSaveTemplate = async (save) => {
-        if (save && pendingBoardData) {
-            const userEmail = localStorage.getItem('crisp_user_email');
-            await userService.saveTemplate(userEmail, {
-                name: boardName + " Template",
-                columns: customColumns.map((c, i) => ({
-                    id: `col-${i}`,
-                    title: c.title,
-                    color: c.color || 'bg-slate-50 border-slate-200',
-                    titleColor: c.titleColor || 'text-slate-800',
-                    order: i
-                }))
-            });
-            toast.success("Template saved!");
-        }
-
-        if (pendingBoardData) {
-            await finalizeBoardCreation(pendingBoardData.id, pendingBoardData.data);
-        }
-    };
 
     const addCustomColumn = () => {
         const newCol = {
@@ -318,6 +316,28 @@ const Home = () => {
         e.stopPropagation();
         const board = recentBoards.find(b => b.id === boardId);
         setItemToDelete({ type: 'history', id: boardId, name: board?.name });
+    };
+
+    const handleUpdateTemplateName = async (templateId, newName) => {
+        if (!newName.trim()) return;
+        const userEmail = localStorage.getItem('crisp_user_email');
+        if (!userEmail) return;
+
+        try {
+            const sanitizedEmail = sanitizeEmail(userEmail);
+            const templateRef = ref(database, `users/${sanitizedEmail}/templates/${templateId}`);
+            await set(templateRef, {
+                ...userTemplates.find(t => t.id === templateId),
+                name: newName.trim(),
+                createdAt: Date.now() // Update time to sort to top if needed
+            });
+            setUserTemplates(prev => prev.map(t => t.id === templateId ? { ...t, name: newName.trim() } : t));
+            setEditingTemplate(null);
+            toast.success('Template renamed');
+        } catch (error) {
+            console.error('Failed to rename template:', error);
+            toast.error('Failed to rename');
+        }
     };
 
     const confirmDelete = async () => {
@@ -500,22 +520,58 @@ const Home = () => {
                                                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
                                                             {userTemplates.map(t => (
                                                                 <div key={t.id} className="relative group/template flex-shrink-0">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedTemplate(t);
-                                                                            setCreationMode('template');
-                                                                        }}
-                                                                        className={`px-3 py-2 pr-8 rounded-lg border text-xs whitespace-nowrap transition-all ${selectedTemplate?.id === t.id && creationMode === 'template' ? 'bg-pink-500/20 border-pink-400 text-pink-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
-                                                                    >
-                                                                        {t.name}
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => handleDeleteTemplate(e, t.id)}
-                                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-rose-400 opacity-0 group-hover/template:opacity-100 transition-all"
-                                                                        title="Delete template"
-                                                                    >
-                                                                        <Trash2 size={12} />
-                                                                    </button>
+                                                                    {editingTemplate?.id === t.id ? (
+                                                                        <div className="flex items-center bg-slate-800 border-cyan-500/50 border rounded-lg overflow-hidden">
+                                                                            <input
+                                                                                type="text"
+                                                                                autoFocus
+                                                                                value={editingTemplate.name}
+                                                                                onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') handleUpdateTemplateName(t.id, editingTemplate.name);
+                                                                                    if (e.key === 'Escape') setEditingTemplate(null);
+                                                                                }}
+                                                                                className="px-3 py-2 bg-transparent text-xs text-white outline-none w-32"
+                                                                            />
+                                                                            <button
+                                                                                onClick={() => handleUpdateTemplateName(t.id, editingTemplate.name)}
+                                                                                className="p-1 px-2 text-cyan-400 hover:bg-cyan-500/20 transition-all border-l border-white/10"
+                                                                            >
+                                                                                <Check size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setSelectedTemplate(t);
+                                                                                    setCreationMode('template');
+                                                                                }}
+                                                                                className={`px-3 py-2 pr-20 rounded-lg border text-xs whitespace-nowrap transition-all ${selectedTemplate?.id === t.id && creationMode === 'template' ? 'bg-pink-500/20 border-pink-400 text-pink-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
+                                                                            >
+                                                                                {t.name}
+                                                                            </button>
+                                                                            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-40 group-hover/template:opacity-100 transition-all">
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        setEditingTemplate({ id: t.id, name: t.name });
+                                                                                    }}
+                                                                                    className="p-1 px-1.5 hover:text-cyan-400 transition-colors"
+                                                                                    title="Rename template"
+                                                                                >
+                                                                                    <Edit2 size={12} />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => handleDeleteTemplate(e, t.id)}
+                                                                                    className="p-1 px-1.5 hover:text-rose-400 transition-colors"
+                                                                                    title="Delete template"
+                                                                                >
+                                                                                    <Trash2 size={12} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -582,8 +638,8 @@ const Home = () => {
                                                                         titleColor: colorOption.titleColor
                                                                     })}
                                                                     className={`w-6 h-6 rounded-full ${colorOption.previewColor} border-2 transition-all ${(col.color === colorOption.color)
-                                                                            ? 'border-white scale-110 ring-2 ring-purple-500/20'
-                                                                            : 'border-transparent hover:scale-110'
+                                                                        ? 'border-white scale-110 ring-2 ring-purple-500/20'
+                                                                        : 'border-transparent hover:scale-110'
                                                                         }`}
                                                                 />
                                                             ))}
@@ -598,45 +654,64 @@ const Home = () => {
                                                 </button>
                                             </div>
 
+                                            {/* Template Naming Options - Moved above finish button */}
+                                            {isLoggedIn && (
+                                                <div className="bg-slate-800/40 rounded-xl p-4 border border-white/5 space-y-4">
+                                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                                        <div className="relative">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={saveAsTemplate}
+                                                                onChange={(e) => {
+                                                                    setSaveAsTemplate(e.target.checked);
+                                                                    if (e.target.checked && !templateName) {
+                                                                        setTemplateName(boardName + " Template");
+                                                                    }
+                                                                }}
+                                                                className="sr-only peer"
+                                                            />
+                                                            <div className="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500 shadow-inner"></div>
+                                                        </div>
+                                                        <span className="text-gray-300 text-sm font-medium group-hover:text-white transition-colors">Save this configuration as a template?</span>
+                                                    </label>
+
+                                                    <AnimatePresence>
+                                                        {saveAsTemplate && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                exit={{ opacity: 0, height: 0 }}
+                                                                className="space-y-2 overflow-hidden"
+                                                            >
+                                                                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold ml-1">Template Name</p>
+                                                                <input
+                                                                    type="text"
+                                                                    autoFocus
+                                                                    value={templateName}
+                                                                    onChange={(e) => setTemplateName(e.target.value)}
+                                                                    placeholder="Enter template name..."
+                                                                    className="w-full px-4 py-2.5 bg-slate-900/50 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-cyan-500 transition-all text-sm"
+                                                                />
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            )}
+
                                             <button
                                                 type="button"
                                                 onClick={handleCreateBoard}
-                                                className="w-full relative group/btn overflow-hidden rounded-xl"
+                                                className="w-full relative group/btn overflow-hidden rounded-xl shadow-lg hover:shadow-cyan-500/20 transition-all"
                                             >
                                                 <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 opacity-100 group-hover/btn:opacity-90 transition-opacity"></div>
-                                                <div className="relative flex items-center justify-center gap-2 py-4 px-6 font-semibold text-white">
+                                                <div className="relative flex items-center justify-center gap-2 py-4 px-6 font-bold text-white uppercase tracking-wider">
                                                     <Plus size={20} />
-                                                    <span>Finish & Create</span>
+                                                    <span>Finish & Create Board</span>
                                                 </div>
                                             </button>
                                         </div>
                                     )}
 
-                                    {creationStep === 3 && (
-                                        <div className="space-y-6 text-center animate-in fade-in zoom-in-95 duration-500">
-                                            <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                <Sparkles className="text-cyan-400" size={32} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <h3 className="text-xl font-bold text-white">Save as Template?</h3>
-                                                <p className="text-sm text-gray-400">Reuse these columns for your next retrospectives.</p>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    onClick={() => handleSaveTemplate(false)}
-                                                    className="py-3 px-4 rounded-xl bg-slate-800 text-gray-300 hover:bg-slate-700 transition-colors"
-                                                >
-                                                    No Thanks
-                                                </button>
-                                                <button
-                                                    onClick={() => handleSaveTemplate(true)}
-                                                    className="py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all"
-                                                >
-                                                    Yes, Save
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
 
                                     {creationStep === 1 && (
                                         <>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, isValidElement, cloneElement } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, LayoutGroup } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy } from 'lucide-react';
+import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy, Sparkles } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -14,6 +14,7 @@ import Poll from '../components/Board/Poll';
 import Tour, { BOARD_TOUR_STEPS_ADMIN, BOARD_TOUR_STEPS_USER } from '../components/Tour';
 import { useToast } from '../components/Toast';
 import { useBoard, COLUMN_COLORS } from '../store/useBoard';
+import { userService } from '../services/userService';
 
 import BoardAudioManager from '../components/Board/BoardAudioManager';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -50,6 +51,10 @@ const BoardPage = () => {
     const [showExitConfirm, setShowExitConfirm] = useState(false);
     const [newColumnTitle, setNewColumnTitle] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLUMN_COLORS[4]); // Default blue
+    const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+    const [templateName, setTemplateName] = useState('');
+    const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+    const [hasColumnChanges, setHasColumnChanges] = useState(false);
     const boardRef = useRef(null);
     const exportMenuRef = useRef(null);
     const userListRef = useRef(null);
@@ -174,6 +179,43 @@ const BoardPage = () => {
         addNote(columnId, '', currentUser, currentUserId);
     };
 
+    const handleSaveAsTemplate = async () => {
+        if (!templateName.trim()) {
+            toast.warning('Please enter a template name');
+            return;
+        }
+
+        setIsSavingTemplate(true);
+        try {
+            const userEmail = localStorage.getItem('crisp_user_email');
+            if (!userEmail) {
+                toast.error('You must be logged in to save templates');
+                return;
+            }
+
+            await userService.saveTemplate(userEmail, {
+                name: templateName.trim(),
+                columns: sortedColumns.map((col, idx) => ({
+                    id: `col-${idx}`,
+                    title: col.title,
+                    color: col.color,
+                    titleColor: col.titleColor,
+                    order: idx
+                }))
+            });
+
+            toast.success('Template saved successfully!');
+            setShowSaveTemplateModal(false);
+            setTemplateName('');
+            setHasColumnChanges(false);
+        } catch (error) {
+            console.error('Failed to save template:', error);
+            toast.error('Failed to save template');
+        } finally {
+            setIsSavingTemplate(false);
+        }
+    };
+
     // Close Export Menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -203,6 +245,7 @@ const BoardPage = () => {
     const handleAddColumn = () => {
         if (!newColumnTitle.trim()) return;
         addColumn(newColumnTitle.trim(), selectedColor);
+        setHasColumnChanges(true);
         setNewColumnTitle('');
         setSelectedColor(COLUMN_COLORS[4]);
         setShowAddColumnModal(false);
@@ -763,10 +806,22 @@ const BoardPage = () => {
                                             </button>
                                             <button
                                                 onClick={handleClearBoard}
-                                                className="w-full flex items-center gap-3 p-3 hover:bg-red-50 text-left text-red-600 transition-colors"
+                                                className="w-full flex items-center gap-3 p-3 hover:bg-red-50 text-left text-red-600 transition-colors border-b border-gray-100"
                                             >
                                                 <Trash2 size={18} /> Clear Board
                                             </button>
+                                            {hasColumnChanges && (
+                                                <button
+                                                    onClick={() => {
+                                                        setTemplateName(boardName + " Template");
+                                                        setShowSaveTemplateModal(true);
+                                                        setShowMobileMenu(false);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 p-3 hover:bg-cyan-50 text-left text-cyan-600 transition-colors"
+                                                >
+                                                    <Sparkles size={18} /> Save as Template
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -808,6 +863,22 @@ const BoardPage = () => {
                                     <span>{isFirebaseReady ? 'Live' : 'Local Mode'}</span>
                                 </div>
                             </div>
+
+                            {/* Save Template Button - Visible only to admins and after changes */}
+                            {isAdmin && hasColumnChanges && (
+                                <div className="hidden lg:flex items-center gap-2 mr-4">
+                                    <button
+                                        onClick={() => {
+                                            setTemplateName(boardName + " Template");
+                                            setShowSaveTemplateModal(true);
+                                        }}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-full text-xs font-bold transition-all shadow-sm hover:shadow-md animate-in fade-in slide-in-from-top-1 duration-500"
+                                    >
+                                        <Sparkles size={14} />
+                                        <span>Save Template</span>
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Online Users - Right Side */}
                             {onlineUsers.length > 0 && (
@@ -1021,7 +1092,12 @@ const BoardPage = () => {
                             <Reorder.Group
                                 axis="x"
                                 values={sortedColumns}
-                                onReorder={(newOrder) => isAdmin && moveColumn(newOrder.map(c => c.id))}
+                                onReorder={(newOrder) => {
+                                    if (isAdmin) {
+                                        moveColumn(newOrder.map(c => c.id));
+                                        setHasColumnChanges(true);
+                                    }
+                                }}
                                 ref={boardRef}
                                 className="flex-1 flex gap-4 md:gap-6 overflow-y-hidden md:overflow-x-auto pb-4 snap-x snap-mandatory md:snap-none"
                             >
@@ -1058,8 +1134,14 @@ const BoardPage = () => {
                                                     onUpdateComment={updateComment}
                                                     onDeleteComment={deleteComment}
                                                     onReorderNotes={reorderNotes}
-                                                    onUpdateColumn={updateColumn}
-                                                    onDeleteColumn={deleteColumn}
+                                                    onUpdateColumn={(id, updates) => {
+                                                        updateColumn(id, updates);
+                                                        setHasColumnChanges(true);
+                                                    }}
+                                                    onDeleteColumn={(id) => {
+                                                        deleteColumn(id);
+                                                        setHasColumnChanges(true);
+                                                    }}
                                                     currentUser={currentUser}
                                                     currentUserId={localStorage.getItem('crisp_user_id')}
                                                     isAdmin={isAdmin}
@@ -1199,6 +1281,71 @@ const BoardPage = () => {
                                     className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-2xl font-bold transition-all active:scale-[0.98]"
                                 >
                                     Stay on Board
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Save Template Modal */}
+            <AnimatePresence>
+                {showSaveTemplateModal && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => !isSavingTemplate && setShowSaveTemplateModal(false)}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full border border-gray-100"
+                        >
+                            <div className="w-16 h-16 bg-cyan-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+                                <Sparkles className="text-cyan-600" size={32} />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-800 text-center mb-2">Save as Template</h2>
+                            <p className="text-gray-500 text-center mb-6">
+                                Enter a name for this template to reuse these columns in future boards.
+                            </p>
+
+                            <div className="mb-6">
+                                <input
+                                    type="text"
+                                    value={templateName}
+                                    onChange={(e) => setTemplateName(e.target.value)}
+                                    placeholder="Template Name"
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
+                                    autoFocus
+                                    disabled={isSavingTemplate}
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={handleSaveAsTemplate}
+                                    disabled={isSavingTemplate || !templateName.trim()}
+                                    className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-600 disabled:bg-gray-300 text-white rounded-2xl font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    {isSavingTemplate ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <span>Saving...</span>
+                                        </>
+                                    ) : (
+                                        <span>Save Template</span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setShowSaveTemplateModal(false)}
+                                    disabled={isSavingTemplate}
+                                    className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-2xl font-bold transition-all active:scale-[0.98]"
+                                >
+                                    Cancel
                                 </button>
                             </div>
                         </motion.div>

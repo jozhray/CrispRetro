@@ -269,7 +269,14 @@ export const useBoard = (boardId) => {
     const updateBoardName = useCallback((name) => {
         setBoardName(name);
         saveData({ name });
-    }, [saveData]);
+
+        // Also update in User History if admin
+        if (isAdmin && userEmail && database) {
+            const sanitizedEmail = sanitizeEmail(userEmail);
+            const historyRef = ref(database, `users/${sanitizedEmail}/boards/${boardId}`);
+            update(historyRef, { name }).catch(err => console.error("Failed to sync board name to history:", err));
+        }
+    }, [saveData, isAdmin, userEmail, boardId]);
 
     // Column CRUD operations
     const addColumn = useCallback((title, colorOption) => {
