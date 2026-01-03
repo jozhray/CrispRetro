@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { database } from '../firebase';
 import { ref, onValue, set, update, remove, runTransaction, onDisconnect, get } from 'firebase/database';
 import { useToast } from '../components/Toast';
-import { sanitizeEmail } from '../services/userService';
+import { userService, sanitizeEmail } from '../services/userService';
 
 // Default columns for new boards
 const DEFAULT_COLUMNS = {
@@ -38,7 +38,9 @@ export const useBoard = (boardId) => {
     const [polls, setPolls] = useState({});
     const [onlineUsers, setOnlineUsers] = useState([]);
     const [allMembers, setAllMembers] = useState({});
+    const [createdAt, setCreatedAt] = useState(null);
     const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+    const [hasLoaded, setHasLoaded] = useState(false);
 
     // Memoized sorted columns
     const sortedColumns = useMemo(() => {
@@ -135,12 +137,17 @@ export const useBoard = (boardId) => {
             }
         });
 
+        // Update History Timestamp if logged in
+        if (userEmail) {
+            userService.updateBoardHistoryTimestamp(userEmail, boardId);
+        }
+
         // Cleanup on component unmount
         return () => {
             onDisconnect(userRef).cancel();
             remove(userRef);
         };
-    }, [boardId, currentUserId, currentUser]);
+    }, [boardId, currentUserId, currentUser, createdAt]);
 
     // Load data (Firebase or LocalStorage)
     useEffect(() => {
@@ -159,6 +166,7 @@ export const useBoard = (boardId) => {
                     setTimer(data.timer || { isRunning: false, timeLeft: 180 });
                     setMusic(data.music || { isPlaying: false });
                     setPolls(data.polls || {});
+                    setCreatedAt(data.createdAt || null);
 
                     // Handle multi-connection online users
                     // Structure: onlineUsers / {userId} / {connectionId} / {userData}
@@ -189,6 +197,7 @@ export const useBoard = (boardId) => {
                     }
                     setOnlineUsers(users);
                     setAllMembers(data.allMembers || {});
+                    setHasLoaded(true);
                 } else {
                     // Try LocalStorage Fallback if Firebase has no data yet
                     // This is helpful during the immediate transition after creation
@@ -203,6 +212,7 @@ export const useBoard = (boardId) => {
                             setTimer(parsed.timer || { isRunning: false, timeLeft: 180 });
                             setMusic(parsed.music || { isPlaying: false });
                             setPolls(parsed.polls || {});
+                            setCreatedAt(parsed.createdAt || null);
                             return; // Keep local data until Firebase has something
                         } catch (e) {
                             console.error("Failed to parse LocalStorage fallback:", e);
@@ -215,6 +225,7 @@ export const useBoard = (boardId) => {
                     setAdminId(null);
                     setOnlineUsers([]);
                     setAllMembers({});
+                    setHasLoaded(true);
                 }
             });
             return () => unsubscribe();
@@ -230,6 +241,8 @@ export const useBoard = (boardId) => {
                 setTimer(parsed.timer || { isRunning: false, timeLeft: 180 });
                 setMusic(parsed.music || { isPlaying: false });
                 setPolls(parsed.polls || {});
+                setCreatedAt(parsed.createdAt || null);
+                setHasLoaded(true);
             }
 
             // Listen for storage events (cross-tab sync)
@@ -244,6 +257,7 @@ export const useBoard = (boardId) => {
                         setTimer(newVal.timer || { isRunning: false, timeLeft: 180 });
                         setMusic(newVal.music || { isPlaying: false });
                         setPolls(newVal.polls || {});
+                        setCreatedAt(newVal.createdAt || null);
                     }
                 }
             };
@@ -272,9 +286,7 @@ export const useBoard = (boardId) => {
 
         // Also update in User History if admin
         if (isAdmin && userEmail && database) {
-            const sanitizedEmail = sanitizeEmail(userEmail);
-            const historyRef = ref(database, `users/${sanitizedEmail}/boards/${boardId}`);
-            update(historyRef, { name }).catch(err => console.error("Failed to sync board name to history:", err));
+            userService.updateBoardHistoryTimestamp(userEmail, boardId, { name });
         }
     }, [saveData, isAdmin, userEmail, boardId]);
 
@@ -702,6 +714,35 @@ export const useBoard = (boardId) => {
         }
     }, [boardId, saveData, toast]);
 
+    const resetBoard = useCallback((keepHistory) => {
+        if (keepHistory) return;
+
+        const now = Date.now();
+        const updates = {
+            notes: null,
+            allMembers: null,
+            createdAt: now,
+            updatedAt: now
+        };
+
+        if (database && boardId) {
+            update(ref(database, `boards/${boardId}`), updates);
+        } else {
+            const currentData = JSON.parse(localStorage.getItem(`crisp_board_${boardId}`) || '{}');
+            const newData = { ...currentData, ...updates };
+            delete newData.notes;
+            delete newData.allMembers;
+            localStorage.setItem(`crisp_board_${boardId}`, JSON.stringify(newData));
+        }
+
+        // Local state updates
+        setNotes({});
+        setCreatedAt(now);
+        setAllMembers({});
+
+        toast.success("Board reset for new session");
+    }, [boardId, toast]);
+
     // Get active poll (most recent active)
     const activePoll = Object.values(polls).find(p => p.isActive) || null;
 
@@ -741,6 +782,9 @@ export const useBoard = (boardId) => {
         clearAllNotes,
         moveColumn,
         reorderNotes,
-        allMembers
+        allMembers,
+        createdAt,
+        resetBoard,
+        hasLoaded
     };
 };

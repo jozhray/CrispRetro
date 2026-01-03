@@ -192,30 +192,42 @@ const Column = ({
         >
             <div className="flex items-center justify-between mb-4">
                 {isEditing ? (
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex items-center gap-1 flex-1 min-w-0">
                         <input
                             type="text"
                             value={editTitle}
                             onChange={(e) => setEditTitle(e.target.value)}
-                            className="flex-1 px-2 py-1 text-lg font-bold rounded border border-gray-300 outline-none focus:ring-2 focus:ring-blue-400"
+                            className="flex-1 min-w-0 px-2 py-1 text-base font-bold rounded border border-gray-300 outline-none focus:ring-2 focus:ring-blue-400 bg-white/80"
                             autoFocus
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleSaveTitle();
                                 if (e.key === 'Escape') handleCancelEdit();
                             }}
+                            onBlur={() => {
+                                // Small timeout to allow button clicks to register
+                                setTimeout(() => {
+                                    if (isEditing) handleSaveTitle();
+                                }, 200);
+                            }}
                         />
-                        <button
-                            onClick={handleSaveTitle}
-                            className="p-1 text-green-600 hover:bg-green-100 rounded"
-                        >
-                            <Check size={18} />
-                        </button>
-                        <button
-                            onClick={handleCancelEdit}
-                            className="p-1 text-gray-500 hover:bg-gray-100 rounded"
-                        >
-                            <X size={18} />
-                        </button>
+                        <div className="flex items-center flex-shrink-0 gap-0.5">
+                            <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={handleSaveTitle}
+                                className="p-1 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
+                                title="Save changes"
+                            >
+                                <Check size={18} />
+                            </button>
+                            <button
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={handleCancelEdit}
+                                className="p-1 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors"
+                                title="Cancel"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -228,7 +240,12 @@ const Column = ({
                                     <GripVertical size={20} />
                                 </div>
                             )}
-                            <h2 className={`font-bold text-lg truncate ${column.titleColor} ${hideTitleOnMobile ? 'hidden md:block' : ''}`}>{column.title}</h2>
+                            <h2
+                                onClick={() => isAdmin && setIsEditing(true)}
+                                className={`font-bold text-lg flex items-center flex-nowrap gap-2 whitespace-nowrap ${column.titleColor} ${hideTitleOnMobile ? 'hidden md:block' : ''} ${isAdmin ? 'cursor-pointer hover:bg-white/40 px-1 -ml-1 rounded border border-transparent hover:border-white/60 transition-all group/title' : ''}`}
+                            >
+                                <span className="truncate">{column.title}</span>
+                            </h2>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="bg-white/50 px-2 py-1 rounded-full text-xs font-medium text-gray-600">
@@ -241,7 +258,9 @@ const Column = ({
                                         className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                         title="Column Actions"
                                     >
-                                        <MoreVertical size={16} />
+                                        <div className="flex items-center">
+                                            <MoreVertical size={16} />
+                                        </div>
                                     </button>
 
                                     {showActionsMenu && (

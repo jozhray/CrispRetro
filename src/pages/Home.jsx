@@ -303,6 +303,15 @@ const Home = () => {
         }
 
         localStorage.setItem('crisp_user_name', name);
+
+        // Add to history if logged in
+        const userEmail = localStorage.getItem('crisp_user_email');
+        if (userEmail) {
+            // We don't have the board name yet, but updateBoardHistoryTimestamp 
+            // will handle it or we can fetch it. 
+            // For now, let's just navigate; BoardPage will handle the timestamp update.
+        }
+
         navigate(`/board/${boardId}`);
     };
 
@@ -500,7 +509,6 @@ const Home = () => {
                                                 {!boardId && (
                                                     <div className="grid grid-cols-2 gap-2" id="creation-modes">
                                                         <button
-                                                            onClick={() => setCreationMode('default')}
                                                             className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'default' ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
                                                         >
                                                             Default Columns
@@ -736,15 +744,24 @@ const Home = () => {
                                                         <Clock size={14} /> Recent Boards (Last 30 Days)
                                                     </label>
                                                     <div id="recent-history" className="max-h-32 overflow-y-auto bg-slate-800/50 rounded-lg border border-gray-700/50 custom-scrollbar">
-                                                        {recentBoards.map((board) => (
-                                                            <div key={board.id} className="group/item flex items-center border-b border-gray-700/30 last:border-0 hover:bg-white/5">
+                                                        {recentBoards.map((board, index) => (
+                                                            <div key={board.id} className="group/item flex items-center border-b border-gray-700/30 last:border-0 hover:bg-cyan-500/5 transition-all">
                                                                 <button
                                                                     onClick={() => navigate(`/board/${board.id}`)}
-                                                                    className="flex-1 text-left px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors flex justify-between items-center overflow-hidden"
+                                                                    className="flex-1 text-left px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors flex flex-col min-w-0"
                                                                 >
-                                                                    <span className="truncate">{board.name}</span>
-                                                                    <span className="text-[10px] text-gray-500 ml-2 whitespace-nowrap">
-                                                                        {new Date(board.createdAt).toLocaleDateString()}
+                                                                    <div className="flex items-center gap-2 w-full">
+                                                                        <span className="truncate font-medium">{board.name}</span>
+                                                                        {index === 0 && (
+                                                                            <span className="px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded text-[9px] text-cyan-400 font-bold uppercase tracking-tight animate-pulse shrink-0">
+                                                                                {new Date(board.updatedAt || board.createdAt).toDateString() === new Date().toDateString()
+                                                                                    ? 'Accessed today'
+                                                                                    : 'Last accessed'}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[10px] text-gray-500">
+                                                                        {new Date(board.updatedAt || board.createdAt).toLocaleDateString()}
                                                                     </span>
                                                                 </button>
                                                                 <button

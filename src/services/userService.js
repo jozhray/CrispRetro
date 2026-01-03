@@ -110,10 +110,28 @@ export const userService = {
                 id: boardData.id,
                 name: boardData.name,
                 createdAt: Date.now(),
+                updatedAt: Date.now(),
                 role: 'owner'
             });
         } catch (error) {
             console.error("Failed to save board history:", error);
+        }
+    },
+
+    // Update board history timestamp or name
+    updateBoardHistoryTimestamp: async (email, boardId, updates = {}) => {
+        if (!email || !boardId) return;
+
+        const sanitizedEmail = sanitizeEmail(email);
+        const historyRef = ref(database, `users/${sanitizedEmail}/boards/${boardId}`);
+
+        try {
+            await update(historyRef, {
+                ...updates,
+                updatedAt: Date.now()
+            });
+        } catch (error) {
+            console.error("Failed to update board history timestamp:", error);
         }
     },
 
@@ -135,8 +153,15 @@ export const userService = {
                 const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
                 return Object.values(data)
-                    .filter(board => (now - board.createdAt) < thirtyDaysMs)
-                    .sort((a, b) => b.createdAt - a.createdAt); // Newest first
+                    .filter(board => {
+                        const lastInteraction = board.updatedAt || board.createdAt;
+                        return (now - lastInteraction) < thirtyDaysMs;
+                    })
+                    .sort((a, b) => {
+                        const timeA = a.updatedAt || a.createdAt;
+                        const timeB = b.updatedAt || b.createdAt;
+                        return timeB - timeA;
+                    });
             }
             return [];
         } catch (error) {

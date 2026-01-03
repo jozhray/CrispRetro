@@ -8,6 +8,12 @@
   }
 }
 
+@layer components {
+  .retro-glow {
+    text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+  }
+}
+
 /* Scrollbar utilities */
 .scrollbar-none::-webkit-scrollbar {
   display: none;

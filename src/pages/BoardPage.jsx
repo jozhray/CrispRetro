@@ -52,6 +52,9 @@ const BoardPage = () => {
     const [newColumnTitle, setNewColumnTitle] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLUMN_COLORS[4]); // Default blue
     const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [hasCheckedAge, setHasCheckedAge] = useState(false);
+    const lastCreatedAtRef = useRef(null);
     const [templateName, setTemplateName] = useState('');
     const [isSavingTemplate, setIsSavingTemplate] = useState(false);
     const [hasColumnChanges, setHasColumnChanges] = useState(false);
@@ -114,7 +117,10 @@ const BoardPage = () => {
         clearAllNotes,
         moveColumn,
         reorderNotes,
-        allMembers
+        allMembers,
+        createdAt,
+        resetBoard,
+        hasLoaded
     } = useBoard(boardId);
 
     // Prevent accidental navigation
@@ -129,6 +135,47 @@ const BoardPage = () => {
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isAdmin]);
+
+    // Check if board is old and prompt for reset (Admin only)
+    useEffect(() => {
+        // We wait for data to be loaded AND firebase to be ready
+        if (hasLoaded && isFirebaseReady && isAdmin && !hasCheckedAge) {
+            const tenSecondsMs = 10 * 1000;
+
+            // If createdAt is missing (null/undefined), it's a board from before this feature, 
+            // so we treat it as old to give the admin a chance to reset it.
+            // BUT we only do this if it's NOT a board that was just created (which would have been cached locally with a timestamp)
+            const isOld = !createdAt || (Date.now() - createdAt > tenSecondsMs);
+
+            if (isOld) {
+                setShowResetModal(true);
+            }
+            setHasCheckedAge(true);
+        }
+    }, [hasLoaded, isFirebaseReady, isAdmin, createdAt, hasCheckedAge]);
+
+    // Detect if board was reset by admin (for regular users)
+    useEffect(() => {
+        if (createdAt && lastCreatedAtRef.current && createdAt > lastCreatedAtRef.current) {
+            if (!isAdmin) {
+                toast.info("Admin reset the board so you will get new board to intact the team.", {
+                    duration: 6000,
+                    icon: <Sparkles className="text-blue-500" size={18} />
+                });
+            }
+        }
+        if (createdAt) {
+            lastCreatedAtRef.current = createdAt;
+        }
+    }, [createdAt, isAdmin, toast]);
+
+    // Update board history timestamp when entering
+    useEffect(() => {
+        const userEmail = localStorage.getItem('crisp_user_email');
+        if (userEmail && isFirebaseReady && boardName) {
+            userService.updateBoardHistoryTimestamp(userEmail, boardId, { name: boardName });
+        }
+    }, [boardId, boardName, isFirebaseReady]);
 
     // Compute offline users
     const offlineUsers = useMemo(() => {
@@ -1352,6 +1399,57 @@ const BoardPage = () => {
                                     Cancel
                                 </button>
                             </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Board Reset Prompt Modal */}
+            <AnimatePresence>
+                {showResetModal && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowResetModal(false)}
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="relative bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full border border-gray-100"
+                        >
+                            <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+                                <Clock className="text-amber-600" size={32} />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-800 text-center mb-2">Reuse this board?</h2>
+                            <p className="text-gray-500 text-center mb-8">
+                                This board is more than a day old. Use it again with a fresh start or keep existing history?
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        resetBoard(false);
+                                        setShowResetModal(false);
+                                    }}
+                                    className="w-full py-3.5 bg-gray-900 hover:bg-black text-white rounded-2xl font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <Sparkles size={18} />
+                                    Without History (Reset)
+                                </button>
+                                <button
+                                    onClick={() => setShowResetModal(false)}
+                                    className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-2xl font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    <Clock size={18} />
+                                    With History (Keep)
+                                </button>
+                            </div>
+                            <p className="mt-4 text-[10px] text-center text-gray-400">
+                                Note: "Without History" will clear all notes and reset the member list for today's tracking.
+                            </p>
                         </motion.div>
                     </div>
                 )}
