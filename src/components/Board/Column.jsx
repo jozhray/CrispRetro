@@ -231,7 +231,7 @@ const Column = ({
                     </div>
                 ) : (
                     <>
-                        <div className="flex items-center gap-1.5 overflow-hidden">
+                        <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
                             {isAdmin && (
                                 <div
                                     className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-gray-400 hover:text-gray-600 rounded touch-none"
@@ -244,10 +244,10 @@ const Column = ({
                                 onClick={() => isAdmin && setIsEditing(true)}
                                 className={`font-bold text-lg flex items-center flex-nowrap gap-2 whitespace-nowrap ${column.titleColor} ${hideTitleOnMobile ? 'hidden md:block' : ''} ${isAdmin ? 'cursor-pointer hover:bg-white/40 px-1 -ml-1 rounded border border-transparent hover:border-white/60 transition-all group/title' : ''}`}
                             >
-                                <span className="truncate">{column.title}</span>
+                                <span className="truncate" title={column.title}>{column.title}</span>
                             </h2>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="bg-white/50 px-2 py-1 rounded-full text-xs font-medium text-gray-600">
                                 {filteredNotes.length}
                             </span>

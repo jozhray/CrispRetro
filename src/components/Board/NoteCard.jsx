@@ -161,6 +161,18 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
             style={{ backgroundColor: note.color || '#ffffff' }}
             className={`p-4 rounded-xl shadow-sm border border-gray-100 group hover:shadow-md transition-all relative overflow-hidden ${!canMove ? 'cursor-default' : ''}`}
         >
+            {/* Top Right Action (Color Palette ONLY) */}
+            {canDelete && (
+                <div className="absolute top-2 right-2 flex items-center z-20">
+                    <button
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        className={`p-1.5 rounded-full transition-all ${isDarkBackground ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'} opacity-0 group-hover:opacity-100`}
+                        title="Change color"
+                    >
+                        <Palette size={14} />
+                    </button>
+                </div>
+            )}
             {/* Floating thumbs up animation */}
             <AnimatePresence>
                 {showVoteAnimation && (
@@ -207,7 +219,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                     </div>
                 )}
 
-                <div className="flex-1 mb-2">
+                <div className="flex-1 mb-2 pr-6">
                     <textarea
                         ref={textareaRef}
                         value={note.content}
@@ -222,12 +234,12 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
             </div>
 
             <div className={`flex items-center justify-between text-xs mt-3 pt-3 border-t ${isDarkBackground ? 'border-white/10 text-white/70' : 'border-gray-50 text-gray-500'}`}>
-                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${isDarkBackground ? 'bg-black/20' : 'bg-gray-50'}`}>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full flex-1 min-w-0 ${isDarkBackground ? 'bg-black/20' : 'bg-gray-50'}`}>
                     <User size={12} />
-                    <span className="font-medium truncate max-w-[100px]">{note.author}</span>
+                    <span className="font-medium truncate" title={note.author}>{note.author}</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Comment Toggle */}
                     <button
                         onClick={() => hasContent && setShowComments(!showComments)}
@@ -270,13 +282,6 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                     {canDelete && (
                         <div className="flex items-center gap-1">
                             <button
-                                onClick={() => setShowColorPicker(!showColorPicker)}
-                                className={`p-1.5 rounded-full transition-all ${isDarkBackground ? 'text-white/40 hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-50'} opacity-0 group-hover:opacity-100`}
-                                title="Change color"
-                            >
-                                <Palette size={14} />
-                            </button>
-                            <button
                                 onClick={() => onDelete(note.id)}
                                 className={`p-1.5 rounded-full transition-all ${isDarkBackground ? 'text-white/40 hover:text-red-300 hover:bg-red-900/40' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'} opacity-0 group-hover:opacity-100`}
                                 title="Delete note"
@@ -292,10 +297,10 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
             <AnimatePresence>
                 {showColorPicker && canDelete && (
                     <motion.div
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute bottom-12 right-4 z-[70] bg-white shadow-2xl border border-gray-100 rounded-lg p-2.5 flex gap-1.5 flex-wrap max-w-[200px]"
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute top-12 right-2 z-[70] bg-white shadow-2xl border border-gray-100 rounded-lg p-2.5 flex gap-1.5 flex-wrap max-w-[200px]"
                     >
                         {NOTE_COLORS.map(c => (
                             <button
@@ -327,8 +332,8 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                             {/* Comment List */}
                             {note.comments && Object.values(note.comments).sort((a, b) => a.createdAt - b.createdAt).map(comment => (
                                 <div key={comment.id} className="bg-gray-50/50 p-2.5 rounded-lg text-xs group/comment relative border border-gray-100">
-                                    <div className="flex justify-between items-start mb-1 h-5">
-                                        <span className="font-semibold text-gray-700">{comment.author}</span>
+                                    <div className="flex justify-between items-start mb-1 h-5 gap-2">
+                                        <span className="font-semibold text-gray-700 truncate min-w-0 flex-1" title={comment.author}>{comment.author}</span>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] text-gray-400">
                                                 {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

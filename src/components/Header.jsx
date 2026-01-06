@@ -44,7 +44,7 @@ const Header = () => {
 
                     {/* User Info & Actions */}
                     <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-white/90 line-clamp-1">{userName}</span>
+                        <span className="text-sm font-semibold text-white/90 truncate max-w-[120px] sm:max-w-[200px] md:max-w-[300px]" title={userName}>{userName}</span>
 
                         {isAdmin && (
                             <button

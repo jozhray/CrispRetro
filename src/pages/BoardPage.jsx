@@ -140,19 +140,23 @@ const BoardPage = () => {
     useEffect(() => {
         // We wait for data to be loaded AND firebase to be ready
         if (hasLoaded && isFirebaseReady && isAdmin && !hasCheckedAge) {
-            const tenSecondsMs = 10 * 1000;
+            const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+            const hasNotes = Object.keys(notes).length > 0;
+            const hasOtherMembers = allMembers && Object.keys(allMembers).length > 1;
 
             // If createdAt is missing (null/undefined), it's a board from before this feature, 
             // so we treat it as old to give the admin a chance to reset it.
-            // BUT we only do this if it's NOT a board that was just created (which would have been cached locally with a timestamp)
-            const isOld = !createdAt || (Date.now() - createdAt > tenSecondsMs);
+            // BUT we only do this if:
+            // 1. It's not a board that was just created (< 24h)
+            // 2. The board has notes OR other members (don't ask to reset if completely empty)
+            const isOld = !createdAt || (Date.now() - createdAt > twentyFourHoursMs);
 
-            if (isOld) {
+            if (isOld && (hasNotes || hasOtherMembers)) {
                 setShowResetModal(true);
             }
             setHasCheckedAge(true);
         }
-    }, [hasLoaded, isFirebaseReady, isAdmin, createdAt, hasCheckedAge]);
+    }, [hasLoaded, isFirebaseReady, isAdmin, createdAt, hasCheckedAge, boardId, notes, allMembers]);
 
     // Detect if board was reset by admin (for regular users)
     useEffect(() => {
@@ -716,7 +720,7 @@ const BoardPage = () => {
                                     <ArrowLeft size={20} />
                                 </button>
                             )}
-                            <h1 className="text-xl font-bold text-gray-800 truncate">{boardName}</h1>
+                            <h1 className="text-xl font-bold text-gray-800 truncate" title={boardName}>{boardName}</h1>
                             <div className={`w-2 h-2 rounded-full ${isFirebaseReady ? 'bg-green-500' : 'bg-orange-500'} shadow-sm`} title={isFirebaseReady ? "Live" : "Local Mode"}></div>
                         </div>
 
@@ -971,7 +975,7 @@ const BoardPage = () => {
                                                             {user.name.charAt(0).toUpperCase()}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="text-sm font-medium text-gray-800 truncate">
+                                                            <div className="text-sm font-medium text-gray-800 truncate" title={user.name}>
                                                                 {user.name} {user.id === localStorage.getItem('crisp_user_id') && <span className="text-blue-500 font-bold">(You)</span>}
                                                             </div>
                                                             <div className="text-[10px] text-green-600 font-medium">Online</div>
@@ -988,7 +992,7 @@ const BoardPage = () => {
                                                                     {user.name.charAt(0).toUpperCase()}
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <div className="text-sm font-medium text-gray-600 truncate">{user.name}</div>
+                                                                    <div className="text-sm font-medium text-gray-600 truncate" title={user.name}>{user.name}</div>
                                                                     <div className="text-[10px] text-gray-400">
                                                                         Last seen: {user.lastSeen ? new Date(user.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
                                                                     </div>
@@ -1005,7 +1009,7 @@ const BoardPage = () => {
                         </div>
 
                         {/* Unified Toolbar - Precision Balanced (Auto-wraps elegantly at high zoom) */}
-                        <div className="flex flex-row flex-wrap lg:flex-nowrap items-center justify-between gap-1 lg:gap-2 bg-white/60 backdrop-blur-md p-1 rounded-2xl border border-white/50 shadow-sm relative z-50">
+                        <div className="flex flex-row flex-wrap items-center justify-between gap-2 bg-white/60 backdrop-blur-md p-1 rounded-2xl border border-white/50 shadow-sm relative z-50">
                             {/* 1. Session Controls Group (Fixed) */}
                             <div className="flex flex-nowrap items-center justify-start gap-1 shrink-0" id="audio-controls">
                                 <div className="flex items-center gap-0.5 bg-gray-100/50 p-0.5 rounded-xl border border-gray-200/50">
@@ -1048,7 +1052,7 @@ const BoardPage = () => {
                             </div>
 
                             {/* 2. Search Box (Trigger Element - Forces wrap at high zoom) */}
-                            <div className="relative flex-grow min-w-[150px] max-w-[180px] mx-1">
+                            <div className="relative flex-grow min-w-[80px] max-w-[200px] mx-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                                 <input
                                     type="text"
@@ -1109,7 +1113,7 @@ const BoardPage = () => {
                                         title="Clear all notes"
                                     >
                                         <Trash2 size={16} />
-                                        <span className="hidden lg:inline">Clear Board</span>
+                                        <span className="inline">Clear Board</span>
                                     </button>
                                 )}
                             </div>
@@ -1426,7 +1430,7 @@ const BoardPage = () => {
                             </div>
                             <h2 className="text-2xl font-bold text-gray-800 text-center mb-2">Reuse this board?</h2>
                             <p className="text-gray-500 text-center mb-8">
-                                This board is more than a day old. Use it again with a fresh start or keep existing history?
+                                This board is more than a day old. Use it again with a fresh start for today or keep existing history?
                             </p>
                             <div className="flex flex-col gap-3">
                                 <button
@@ -1440,7 +1444,9 @@ const BoardPage = () => {
                                     Without History (Reset)
                                 </button>
                                 <button
-                                    onClick={() => setShowResetModal(false)}
+                                    onClick={() => {
+                                        setShowResetModal(false);
+                                    }}
                                     className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-2xl font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                                 >
                                     <Clock size={18} />
