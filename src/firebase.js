@@ -20,18 +20,13 @@ let database;
 let auth;
 
 try {
-    const missingKeys = Object.entries(firebaseConfig)
-        .filter(([key, value]) => !value)
-        .map(([key]) => key);
-
-    if (missingKeys.length === 0) {
+    if (firebaseConfig.apiKey && firebaseConfig.databaseURL) {
         app = initializeApp(firebaseConfig);
         database = getDatabase(app);
         auth = getAuth(app);
         console.log("Firebase initialized successfully");
     } else {
-        console.warn("Firebase initialization skipped. Missing keys:", missingKeys.join(", "));
-        console.warn("Falling back to local storage mode.");
+        console.warn("Firebase credentials not found. Falling back to local storage.");
     }
 } catch (error) {
     console.error("Error initializing Firebase:", error);
