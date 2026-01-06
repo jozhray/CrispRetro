@@ -30,6 +30,14 @@ const Login = () => {
         setIsLoading(true);
 
         try {
+            // Check if Firebase auth is initialized
+            const { auth } = await import('../firebase');
+            if (!auth) {
+                toast.error("Firebase is not initialized. Check your environment variables (VITE_FIREBASE_*).");
+                setIsLoading(false);
+                return;
+            }
+
             if (mode === 'register') {
                 if (!name.trim() || !email.trim() || !password || !confirmPassword) {
                     toast.warning('All fields are required');
