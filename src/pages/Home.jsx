@@ -10,9 +10,11 @@ import { ref, set, get } from 'firebase/database';
 import { userService, sanitizeEmail } from '../services/userService';
 import { Clock } from 'lucide-react';
 import { COLUMN_COLORS } from '../store/useBoard';
+import AvatarPicker from '../components/AvatarPicker';
 
 const Home = () => {
     const [name, setName] = useState(localStorage.getItem('crisp_user_name') || '');
+    const [avatar, setAvatar] = useState(localStorage.getItem('crisp_user_avatar') || '👾');
     const [boardName, setBoardName] = useState('');
     const [boardId, setBoardId] = useState('');
     const [recentBoards, setRecentBoards] = useState([]);
@@ -158,6 +160,7 @@ const Home = () => {
         }
 
         localStorage.setItem('crisp_user_name', name);
+        localStorage.setItem('crisp_user_avatar', avatar);
         const userId = localStorage.getItem('crisp_user_id');
         const newBoardId = crypto.randomUUID();
 
@@ -303,6 +306,7 @@ const Home = () => {
         }
 
         localStorage.setItem('crisp_user_name', name);
+        localStorage.setItem('crisp_user_avatar', avatar);
 
         // Add to history if logged in
         const userEmail = localStorage.getItem('crisp_user_email');
@@ -477,17 +481,23 @@ const Home = () => {
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                                             {/* Name Input - Only for Guests */}
                                             {!isLoggedIn && (
-                                                <div className="relative">
-                                                    <input
-                                                        ref={nameInputRef}
-                                                        type="text"
-                                                        value={name}
-                                                        onChange={(e) => setName(e.target.value)}
-                                                        placeholder="Enter your name"
-                                                        className="w-full px-4 py-3 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all backdrop-blur-sm"
-                                                    />
-                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
-                                                        <Users size={16} />
+                                                <div className="space-y-4">
+                                                    <div className="relative">
+                                                        <input
+                                                            ref={nameInputRef}
+                                                            type="text"
+                                                            value={name}
+                                                            onChange={(e) => setName(e.target.value)}
+                                                            placeholder="Enter your name"
+                                                            className="w-full px-4 py-3 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all backdrop-blur-sm"
+                                                        />
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                                                            <Users size={16} />
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="bg-slate-800/30 p-3 rounded-lg border border-white/5">
+                                                        <AvatarPicker avatar={avatar} setAvatar={setAvatar} />
                                                     </div>
                                                 </div>
                                             )}
@@ -507,20 +517,29 @@ const Home = () => {
                                                 />
 
                                                 {!boardId && (
-                                                    <div className="grid grid-cols-2 gap-2" id="creation-modes">
-                                                        <button
-                                                            className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'default' ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
-                                                        >
-                                                            Default Columns
-                                                        </button>
-                                                        <button
-                                                            id="custom-mode-btn"
-                                                            onClick={() => setCreationMode('custom')}
-                                                            className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'custom' ? 'bg-purple-500/20 border-purple-400 text-purple-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
-                                                        >
-                                                            Custom Columns
-                                                        </button>
-                                                    </div>
+                                                    <>
+                                                        {/* Show Avatar Picker here for Logged-In Users creating a board */}
+                                                        {isLoggedIn && (
+                                                            <div className="bg-slate-800/30 p-3 rounded-lg border border-white/5">
+                                                                <AvatarPicker avatar={avatar} setAvatar={setAvatar} />
+                                                            </div>
+                                                        )}
+
+                                                        <div className="grid grid-cols-2 gap-2" id="creation-modes">
+                                                            <button
+                                                                className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'default' ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
+                                                            >
+                                                                Default Columns
+                                                            </button>
+                                                            <button
+                                                                id="custom-mode-btn"
+                                                                onClick={() => setCreationMode('custom')}
+                                                                className={`p-3 rounded-lg border text-sm transition-all ${creationMode === 'custom' ? 'bg-purple-500/20 border-purple-400 text-purple-300' : 'bg-slate-800/50 border-gray-700 text-gray-400 hover:border-gray-600'}`}
+                                                            >
+                                                                Custom Columns
+                                                            </button>
+                                                        </div>
+                                                    </>
                                                 )}
 
                                                 {isLoggedIn && userTemplates.length > 0 && !boardId && (

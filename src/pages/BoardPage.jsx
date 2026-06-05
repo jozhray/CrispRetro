@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, isValidElement, cloneElement } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, LayoutGroup } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy, Sparkles } from 'lucide-react';
+import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy, Sparkles, ListTodo, Minus, Maximize2, ChevronUp } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -15,6 +15,7 @@ import Tour, { BOARD_TOUR_STEPS_ADMIN, BOARD_TOUR_STEPS_USER } from '../componen
 import { useToast } from '../components/Toast';
 import { useBoard, COLUMN_COLORS } from '../store/useBoard';
 import { userService } from '../services/userService';
+import { AvatarDisplay } from '../components/Header';
 
 import BoardAudioManager from '../components/Board/BoardAudioManager';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -38,6 +39,19 @@ const DraggableColumn = ({ column, isMobileAndHidden, className, children, onDra
         </Reorder.Item>
     );
 };
+
+const ANIMATION_OPTIONS = [
+    { id: 'bubbles', name: 'bubbles', emoji: '🫧' },
+    { id: 'stars', name: 'stars', emoji: '✨' },
+    { id: 'particles', name: 'shapes', emoji: '📐' },
+    { id: 'snow', name: 'snow', emoji: '❄️' },
+    { id: 'clouds', name: 'clouds', emoji: '☁️' },
+    { id: 'retro-grid', name: 'synthwave', emoji: '🛹' },
+    { id: 'matrix', name: 'matrix', emoji: '💾' },
+    { id: 'aurora', name: 'aurora', emoji: '🌌' },
+    { id: 'waves', name: 'waves', emoji: '🌊' },
+    { id: 'none', name: 'no animation', emoji: '🚫' }
+];
 
 const BoardPage = () => {
     const { boardId } = useParams();
@@ -63,6 +77,15 @@ const BoardPage = () => {
     const userListRef = useRef(null);
     const currentUser = localStorage.getItem('crisp_user_name') || 'Anonymous';
     const toast = useToast();
+
+    // Background Animation Options
+    const [bgAnimation, setBgAnimation] = useState(() => localStorage.getItem('crisp_bg_animation') || 'bubbles');
+    const [showBgDropdown, setShowBgDropdown] = useState(false);
+    const bgDropdownRef = useRef(null);
+
+    // Action Items Panel State
+    const [showActionItems, setShowActionItems] = useState(false);
+    const [isActionItemsMinimized, setIsActionItemsMinimized] = useState(false);
 
     // Global Audio State
     const [musicVolume, setMusicVolume] = useState(() => parseFloat(localStorage.getItem('crisp_music_vol') || '0.5'));
@@ -92,6 +115,10 @@ const BoardPage = () => {
         music,
         polls,
         activePoll,
+        actionItems,
+        addActionItem,
+        updateActionItem,
+        deleteActionItem,
         onlineUsers,
         addColumn,
         updateColumn,
@@ -120,7 +147,8 @@ const BoardPage = () => {
         allMembers,
         createdAt,
         resetBoard,
-        hasLoaded
+        hasLoaded,
+        currentUserAvatar
     } = useBoard(boardId);
 
     // Prevent accidental navigation
@@ -267,7 +295,7 @@ const BoardPage = () => {
         }
     };
 
-    // Close Export Menu when clicking outside
+    // Close menus when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
@@ -281,17 +309,27 @@ const BoardPage = () => {
             }
         };
 
+        const handleClickOutsideBgDropdown = (event) => {
+            if (bgDropdownRef.current && !bgDropdownRef.current.contains(event.target)) {
+                setShowBgDropdown(false);
+            }
+        };
+
         if (showExportMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         if (showUserList) {
             document.addEventListener('mousedown', handleClickOutsideUserList);
         }
+        if (showBgDropdown) {
+            document.addEventListener('mousedown', handleClickOutsideBgDropdown);
+        }
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('mousedown', handleClickOutsideUserList);
+            document.removeEventListener('mousedown', handleClickOutsideBgDropdown);
         };
-    }, [showExportMenu, showUserList]);
+    }, [showExportMenu, showUserList, showBgDropdown]);
 
     const handleAddColumn = () => {
         if (!newColumnTitle.trim()) return;
@@ -345,8 +383,13 @@ const BoardPage = () => {
             }
 
             const exportData = prepareExportData();
-            if (exportData.length === 0) {
-                toast.warning('No notes to export!');
+            const activeActionItems = Object.values(actionItems || {}).filter(item => item.text && item.text.trim() !== '');
+            const hasNotes = exportData.length > 0;
+            const hasActionItems = activeActionItems.length > 0;
+            const hasMembers = allMembers && Object.keys(allMembers).length > 0;
+
+            if (!hasNotes && !hasActionItems && !hasMembers) {
+                toast.warning('No data to export!');
                 return;
             }
 
@@ -356,6 +399,7 @@ const BoardPage = () => {
                 ['Board ID', boardId],
                 ['Export Date', new Date().toLocaleString()],
                 ['Total Notes', exportData.length],
+                ['Total Action Items', activeActionItems.length],
                 ['Total Members', allMembers ? Object.keys(allMembers).length : 0]
             ];
             const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
@@ -386,13 +430,24 @@ const BoardPage = () => {
             XLSX.utils.book_append_sheet(wb, wsNotes, "Notes");
             XLSX.utils.book_append_sheet(wb, wsMembers, "Team Members");
 
+            // Sheet 4: Action Items (if any exist)
+            if (activeActionItems.length > 0) {
+                const actionItemData = activeActionItems.map(item => ({
+                    'Action Item': item.text,
+                    'Created At': item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A'
+                }));
+                const wsActionItems = XLSX.utils.json_to_sheet(actionItemData);
+                wsActionItems['!cols'] = [{ wch: 60 }, { wch: 25 }];
+                XLSX.utils.book_append_sheet(wb, wsActionItems, "Action Items");
+            }
+
             const now = new Date();
             const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
             const nameToUse = boardName || 'Retro-Board';
             const safeName = nameToUse.replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-');
             XLSX.writeFile(wb, `${safeName}_${timestamp}.xlsx`);
             setShowExportMenu(false);
-            toast.success('Exported to Excel with 3 sheets!');
+            toast.success(activeActionItems.length > 0 ? 'Exported to Excel with 4 sheets!' : 'Exported to Excel with 3 sheets!');
         } catch (err) {
             console.error('Export failed', err);
             toast.error('Failed to export to Excel');
@@ -407,8 +462,13 @@ const BoardPage = () => {
             }
 
             const exportData = prepareExportData();
-            if (exportData.length === 0) {
-                toast.warning('No notes to export!');
+            const activeActionItems = Object.values(actionItems || {}).filter(item => item.text && item.text.trim() !== '');
+            const hasNotes = exportData.length > 0;
+            const hasActionItems = activeActionItems.length > 0;
+            const hasMembers = allMembers && Object.keys(allMembers).length > 0;
+
+            if (!hasNotes && !hasActionItems && !hasMembers) {
+                toast.warning('No data to export!');
                 return;
             }
 
@@ -442,6 +502,18 @@ const BoardPage = () => {
                     });
             }
 
+            // Add Action Items Section with clear delimiter
+            if (activeActionItems.length > 0) {
+                csvRows.push('\n');
+                csvRows.push('-------------------------------------------');
+                csvRows.push('ACTION ITEMS');
+                csvRows.push('-------------------------------------------');
+                csvRows.push('Action Item,Created At');
+                activeActionItems.forEach(item => {
+                    csvRows.push(`"${item.text.replace(/"/g, '""')}","${new Date(item.createdAt).toLocaleString()}"`);
+                });
+            }
+
             const csvString = csvRows.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
@@ -455,7 +527,7 @@ const BoardPage = () => {
             a.click();
             window.URL.revokeObjectURL(url);
             setShowExportMenu(false);
-            toast.success('Exported to CSV with Team Members!');
+            toast.success('Exported to CSV with Action Items!');
         } catch (err) {
             console.error('CSV export failed', err);
             toast.error('Failed to export to CSV');
@@ -470,8 +542,13 @@ const BoardPage = () => {
             }
 
             const exportData = prepareExportData();
-            if (exportData.length === 0) {
-                toast.warning('No notes to export!');
+            const activeActionItems = Object.values(actionItems || {}).filter(item => item.text && item.text.trim() !== '');
+            const hasNotes = exportData.length > 0;
+            const hasActionItems = activeActionItems.length > 0;
+            const hasMembers = allMembers && Object.keys(allMembers).length > 0;
+
+            if (!hasNotes && !hasActionItems && !hasMembers) {
+                toast.warning('No data to export!');
                 return;
             }
 
@@ -495,60 +572,100 @@ const BoardPage = () => {
             let lastY = 55;
 
             // Group notes by column for better display
-            sortedColumns.forEach(column => {
-                const columnNotes = Object.values(notes)
-                    .filter(note => note.columnId === column.id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0));
+            if (hasNotes) {
+                sortedColumns.forEach(column => {
+                    const columnNotes = Object.values(notes)
+                        .filter(note => note.columnId === column.id)
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-                // Always show column title, even if empty
-                // Column Title
+                    // Always show column title, even if empty
+                    // Column Title
+                    doc.setFontSize(14);
+                    doc.setTextColor(0);
+                    // Check if we need a new page for the title
+                    if (lastY > 250) {
+                        doc.addPage();
+                        lastY = 20;
+                    }
+                    doc.text(column.title, 14, lastY);
+                    lastY += 8; // Spacing after title
+
+                    if (columnNotes.length > 0) {
+                        // Table
+                        const tableData = columnNotes.map(note => {
+                            const comments = note.comments
+                                ? Object.values(note.comments).map(c => {
+                                    return `${c.author}: ${c.content}`;
+                                }).join('\n')
+                                : '';
+                            return [
+                                note.content || '',
+                                note.author || 'Anonymous',
+                                (note.votes || 0).toString(),
+                                comments
+                            ];
+                        });
+
+                        autoTable(doc, {
+                            startY: lastY,
+                            head: [['Note', 'Author', 'Votes', 'Comments']],
+                            body: tableData,
+                            theme: 'striped',
+                            headStyles: { fillColor: [66, 66, 66] },
+                            styles: { fontSize: 10, cellPadding: 3 },
+                            columnStyles: {
+                                0: { cellWidth: 'auto' },
+                                1: { cellWidth: 30 },
+                                2: { cellWidth: 15, halign: 'center' },
+                                3: { cellWidth: 50 }
+                            },
+                            margin: { top: 20 }
+                        });
+
+                        lastY = doc.lastAutoTable.finalY + 15;
+                    } else {
+                        // Empty state message
+                        doc.setFontSize(10);
+                        doc.setTextColor(150);
+                        doc.text("(No notes in this column)", 14, lastY);
+                        lastY += 15;
+                    }
+                });
+            } else {
                 doc.setFontSize(14);
-                doc.setTextColor(0);
-                // Check if we need a new page for the title
-                if (lastY > 250) {
+                doc.setTextColor(150);
+                doc.text("(No board notes created in this session)", 14, lastY);
+                lastY += 20;
+            }
+
+            // Add Action Items Page / Section
+            if (activeActionItems.length > 0) {
+                if (hasNotes) {
                     doc.addPage();
                     lastY = 20;
                 }
-                doc.text(column.title, 14, lastY);
-                lastY += 8; // Spacing after title
 
-                if (columnNotes.length > 0) {
-                    // Table
-                    const tableData = columnNotes.map(note => [
-                        note.content || '',
-                        note.author || 'Anonymous',
-                        (note.votes || 0).toString(),
-                        note.comments ? Object.values(note.comments).map(c => `${c.author}: ${c.content}`).join('\n') : ''
-                    ]);
+                doc.setFontSize(16);
+                doc.setTextColor(142, 68, 173); // Purple theme to match Action Items FAB
+                doc.text("Action Items", 14, lastY);
+                doc.setTextColor(0);
 
-                    autoTable(doc, {
-                        startY: lastY,
-                        head: [['Note', 'Author', 'Votes', 'Comments']],
-                        body: tableData,
-                        theme: 'striped',
-                        headStyles: { fillColor: [66, 66, 66] },
-                        styles: { fontSize: 10, cellPadding: 3 },
-                        columnStyles: {
-                            0: { cellWidth: 'auto' },
-                            1: { cellWidth: 30 },
-                            2: { cellWidth: 15, halign: 'center' },
-                            3: { cellWidth: 50 }
-                        },
-                        margin: { top: 20 },
-                        didDrawPage: (data) => {
-                            // Optional: Header on new pages could go here
-                        }
-                    });
+                const actionItemTableData = activeActionItems.map(item => [
+                    item.text,
+                    new Date(item.createdAt).toLocaleString()
+                ]);
 
-                    lastY = doc.lastAutoTable.finalY + 15;
-                } else {
-                    // Empty state message
-                    doc.setFontSize(10);
-                    doc.setTextColor(150);
-                    doc.text("(No notes in this column)", 14, lastY);
-                    lastY += 15;
-                }
-            });
+                autoTable(doc, {
+                    startY: lastY + 5,
+                    head: [['Action Item', 'Created Time']],
+                    body: actionItemTableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [142, 68, 173] }, // Purple matching action items theme
+                    styles: { fontSize: 10, cellPadding: 3 }
+                });
+
+                lastY = doc.lastAutoTable.finalY + 15;
+            }
 
             // Add Team Members Page
             if (allMembers && Object.keys(allMembers).length > 0) {
@@ -562,12 +679,14 @@ const BoardPage = () => {
 
                 const memberData = Object.values(allMembers)
                     .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                    .map(m => [
-                        m.name || 'Anonymous',
-                        m.joinedAt ? new Date(m.joinedAt).toLocaleString() : 'N/A',
-                        m.lastSeen ? new Date(m.lastSeen).toLocaleString() : 'N/A',
-                        onlineUsers.some(u => u.id === m.id) ? 'Online' : 'Offline'
-                    ]);
+                    .map(m => {
+                        return [
+                            m.name || 'Anonymous',
+                            m.joinedAt ? new Date(m.joinedAt).toLocaleString() : 'N/A',
+                            m.lastSeen ? new Date(m.lastSeen).toLocaleString() : 'N/A',
+                            onlineUsers.some(u => u.id === m.id) ? 'Online' : 'Offline'
+                        ];
+                    });
 
                 autoTable(doc, {
                     startY: 25,
@@ -607,6 +726,7 @@ const BoardPage = () => {
                 return;
             }
 
+            const activeActionItems = Object.values(actionItems || {}).filter(item => item.text && item.text.trim() !== '');
             const exportData = {
                 boardName,
                 boardId,
@@ -616,6 +736,10 @@ const BoardPage = () => {
                     title: column.title,
                     color: column.color,
                     notes: Object.values(notes).filter(n => n.columnId === column.id)
+                })),
+                actionItems: activeActionItems.map(item => ({
+                    text: item.text,
+                    createdAt: item.createdAt
                 })),
                 teamMembers: allMembers ? Object.values(allMembers).map(m => ({
                     name: m.name,
@@ -671,7 +795,7 @@ const BoardPage = () => {
 
     return (
         <>
-            <AnimatedBackground />
+            <AnimatedBackground type={bgAnimation} />
             <Layout>
                 {/* ... global components ... */}
                 <Poll
@@ -794,6 +918,27 @@ const BoardPage = () => {
                                     </div>
                                 </div>
 
+                                {/* Vibe selector for Mobile */}
+                                <div className="space-y-3">
+                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Background Theme</div>
+                                    <div className="relative">
+                                        <select
+                                            value={bgAnimation}
+                                            onChange={(e) => {
+                                                setBgAnimation(e.target.value);
+                                                localStorage.setItem('crisp_bg_animation', e.target.value);
+                                            }}
+                                            className="w-full h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none capitalize text-gray-700 font-medium"
+                                        >
+                                            {ANIMATION_OPTIONS.map((opt) => (
+                                                <option key={opt.id} value={opt.id}>
+                                                    {opt.emoji} {opt.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
                                 {/* Utilities */}
                                 <div className="space-y-3">
                                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tools</div>
@@ -832,9 +977,7 @@ const BoardPage = () => {
                                                     <div className="space-y-2">
                                                         {onlineUsers.map(user => (
                                                             <div key={user.id} className="flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
-                                                                    {user.name.charAt(0).toUpperCase()}
-                                                                </div>
+                                                                <AvatarDisplay avatar={user.id === localStorage.getItem('crisp_user_id') ? currentUserAvatar : user.avatar} size="sm" />
                                                                 <span className="text-sm text-gray-600 truncate">{user.name}</span>
                                                             </div>
                                                         ))}
@@ -908,11 +1051,43 @@ const BoardPage = () => {
                                 </div>
                             </div>
 
-                            {/* Live/Local Indicator - Centered */}
-                            <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 flex justify-center mt-2 md:mt-0 z-20 pointer-events-none">
+                            {/* Live/Local Indicator & Background Theme - Centered */}
+                            <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 flex items-center justify-center gap-2 mt-2 md:mt-0 z-[70]">
                                 <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium shadow-sm border backdrop-blur-sm ${isFirebaseReady ? 'bg-green-100/80 text-green-700 border-green-200/50' : 'bg-orange-100/80 text-orange-700 border-orange-200/50'}`}>
                                     {isFirebaseReady ? <Wifi size={12} className="animate-pulse" /> : <WifiOff size={12} />}
                                     <span>{isFirebaseReady ? 'Live' : 'Local Mode'}</span>
+                                </div>
+
+                                {/* Background Selector Dropdown */}
+                                <div className="relative" ref={bgDropdownRef}>
+                                    <button
+                                        onClick={() => setShowBgDropdown(!showBgDropdown)}
+                                        className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border border-white/50 bg-white/70 hover:bg-white text-gray-750 shadow-sm transition-all focus:outline-none"
+                                        title="Choose Vibe Background"
+                                    >
+                                        <Sparkles size={12} className="text-purple-600 animate-pulse" />
+                                        <span className="capitalize">{bgAnimation === 'none' ? 'No animation' : bgAnimation === 'particles' ? 'shapes' : bgAnimation === 'retro-grid' ? 'synthwave' : bgAnimation}</span>
+                                        <ChevronDown size={10} className="opacity-60" />
+                                    </button>
+                                    {showBgDropdown && (
+                                        <div className="absolute left-0 mt-1.5 w-44 bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-gray-200 py-1 z-[110] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 max-h-60 overflow-y-auto scrollbar-thin">
+                                            <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-50 bg-gray-50/50">Vibe Theme</div>
+                                            {ANIMATION_OPTIONS.map((option) => (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={() => {
+                                                        setBgAnimation(option.id);
+                                                        localStorage.setItem('crisp_bg_animation', option.id);
+                                                        setShowBgDropdown(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-1.5 hover:bg-purple-50 text-gray-750 transition-colors flex items-center gap-2 text-xs ${bgAnimation === option.id ? 'bg-purple-50/70 font-semibold text-purple-700' : ''}`}
+                                                >
+                                                    <span className="text-sm">{option.emoji}</span>
+                                                    <span className="capitalize">{option.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -946,13 +1121,13 @@ const BoardPage = () => {
                                         </span>
                                         <div className="flex items-center -space-x-2 group-hover:space-x-0.5 transition-all">
                                             {onlineUsers.slice(0, 4).map((user, index) => (
-                                                <div
+                                                <AvatarDisplay
                                                     key={user.id}
-                                                    className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-sm ring-2 ring-transparent transition-all cursor-pointer relative"
+                                                    avatar={user.id === localStorage.getItem('crisp_user_id') ? currentUserAvatar : user.avatar}
+                                                    size="md"
+                                                    className="!border-white shadow-sm ring-2 ring-transparent transition-all cursor-pointer relative"
                                                     style={{ zIndex: 30 - index }}
-                                                >
-                                                    {user.name.charAt(0).toUpperCase()}
-                                                </div>
+                                                />
                                             ))}
                                             {onlineUsers.length > 4 && (
                                                 <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-500 text-xs font-bold shadow-sm z-30">
@@ -971,9 +1146,7 @@ const BoardPage = () => {
                                             <div className="overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-200">
                                                 {onlineUsers.map(user => (
                                                     <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-blue-50/50 rounded-lg transition-colors">
-                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                                                            {user.name.charAt(0).toUpperCase()}
-                                                        </div>
+                                                        <AvatarDisplay avatar={user.id === localStorage.getItem('crisp_user_id') ? currentUserAvatar : user.avatar} size="md" />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="text-sm font-medium text-gray-800 truncate" title={user.name}>
                                                                 {user.name} {user.id === localStorage.getItem('crisp_user_id') && <span className="text-blue-500 font-bold">(You)</span>}
@@ -988,9 +1161,7 @@ const BoardPage = () => {
                                                         <div className="mt-2 mb-1 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Offline</div>
                                                         {offlineUsers.map(user => (
                                                             <div key={user.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors opacity-70">
-                                                                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                                                                    {user.name.charAt(0).toUpperCase()}
-                                                                </div>
+                                                                <AvatarDisplay avatar={user.avatar} size="md" />
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="text-sm font-medium text-gray-600 truncate" title={user.name}>{user.name}</div>
                                                                     <div className="text-[10px] text-gray-400">
@@ -1199,6 +1370,8 @@ const BoardPage = () => {
                                                     }}
                                                     currentUser={currentUser}
                                                     currentUserId={localStorage.getItem('crisp_user_id')}
+                                                    currentUserAvatar={currentUserAvatar}
+                                                    allMembers={allMembers}
                                                     isAdmin={isAdmin}
                                                     searchQuery={searchQuery}
                                                     hideTitleOnMobile={true}
@@ -1460,6 +1633,128 @@ const BoardPage = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* === ACTION ITEMS FLOATING BUTTON & PANEL (Admin Only) === */}
+            {isAdmin && (
+                <div className="fixed bottom-6 right-6 z-[90] flex flex-col items-end gap-2">
+                    {/* Action Items Panel */}
+                    <AnimatePresence>
+                        {showActionItems && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                animate={{ 
+                                    opacity: 1, 
+                                    y: 0, 
+                                    scale: 1,
+                                    height: '360px',
+                                    width: '320px'
+                                }}
+                                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                                transition={{ duration: 0.2 }}
+                                className="bg-white/90 backdrop-blur-md border border-gray-200 shadow-2xl rounded-2xl overflow-hidden flex flex-col"
+                            >
+                                {/* Panel Header */}
+                                <div className="px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between shadow-sm">
+                                    <div className="flex items-center gap-2">
+                                        <ListTodo size={18} />
+                                        <span className="font-bold text-sm">Action Items</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button 
+                                            onClick={() => setShowActionItems(false)}
+                                            className="p-1 hover:bg-white/20 rounded-md transition-colors"
+                                            title="Close"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Panel Body */}
+                                {/* Action Items List */}
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-200">
+                                    {Object.values(actionItems || {}).length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                                            <span className="text-3xl mb-1">📝</span>
+                                            <p className="text-xs text-gray-400 font-medium">No action items defined yet.</p>
+                                            <p className="text-[10px] text-gray-400">Click the button below to add one.</p>
+                                        </div>
+                                    ) : (
+                                        Object.values(actionItems || {})
+                                            .sort((a, b) => a.createdAt - b.createdAt)
+                                            .map((item) => (
+                                                <div 
+                                                    key={item.id} 
+                                                    className={`flex items-start gap-2 p-2 hover:bg-gray-100/80 border rounded-xl transition-all shadow-sm group ${item.color || 'bg-gray-50 border-gray-150'}`}
+                                                >
+                                                    <div className="flex-1 flex flex-col gap-1">
+                                                        <textarea
+                                                            value={item.text}
+                                                            onChange={(e) => {
+                                                                e.target.style.height = 'auto';
+                                                                e.target.style.height = e.target.scrollHeight + 'px';
+                                                                updateActionItem(item.id, { text: e.target.value });
+                                                            }}
+                                                            placeholder="Enter action item..."
+                                                            className="w-full bg-transparent text-xs text-gray-700 outline-none font-medium border-b border-transparent focus:border-purple-300 py-0.5 transition-all resize-none overflow-hidden"
+                                                            rows={1}
+                                                            style={{ minHeight: '20px' }}
+                                                        />
+                                                        {/* Color options */}
+                                                        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {['bg-gray-50', 'bg-red-50', 'bg-green-50', 'bg-blue-50', 'bg-yellow-50', 'bg-purple-50', 'bg-pink-50'].map(color => (
+                                                                <button
+                                                                    key={color}
+                                                                    onClick={() => updateActionItem(item.id, { color })}
+                                                                    className={`w-3 h-3 rounded-full border border-gray-200 ${color} ${item.color === color ? 'ring-2 ring-offset-1 ring-gray-400' : ''}`}
+                                                                    title="Set color"
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => deleteActionItem(item.id)}
+                                                        className="p-1 mt-0.5 text-gray-400 hover:text-red-500 hover:bg-white/50 rounded-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                                        title="Delete Item"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))
+                                    )}
+                                </div>
+
+                                {/* Panel Footer */}
+                                <div className="p-3 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
+                                    <button
+                                        onClick={() => addActionItem('')}
+                                        className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/10 hover:shadow-lg transition-all"
+                                    >
+                                        <Plus size={14} />
+                                        <span>Add Action Item</span>
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Floating Action Button (FAB) */}
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowActionItems(true)}
+                        className={`p-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-full shadow-2xl transition-all flex items-center justify-center relative ${showActionItems ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100'}`}
+                        title="Action Items"
+                    >
+                        <ListTodo size={22} />
+                        {Object.values(actionItems || {}).filter(item => item.text && item.text.trim() !== '').length > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-pink-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center animate-in zoom-in-50">
+                                {Object.values(actionItems || {}).filter(item => item.text && item.text.trim() !== '').length}
+                            </span>
+                        )}
+                    </motion.button>
+                </div>
+            )}
         </>
     );
 };

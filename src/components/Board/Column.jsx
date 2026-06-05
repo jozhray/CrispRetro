@@ -52,6 +52,8 @@ const Column = ({
     onDeleteColumn,
     currentUser,
     currentUserId,
+    currentUserAvatar,
+    allMembers,
     isAdmin,
     searchQuery,
     hideTitleOnMobile = false,
@@ -422,6 +424,8 @@ const Column = ({
                                 onDeleteComment={onDeleteComment}
                                 currentUser={currentUser}
                                 currentUserId={currentUserId}
+                                currentUserAvatar={currentUserAvatar}
+                                allMembers={allMembers}
                                 isAdmin={isAdmin}
                             />
                         </DraggableNote>

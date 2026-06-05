@@ -36,6 +36,7 @@ export const useBoard = (boardId) => {
     const [timer, setTimer] = useState({ isRunning: false, timeLeft: 180 });
     const [music, setMusic] = useState({ isPlaying: false });
     const [polls, setPolls] = useState({});
+    const [actionItems, setActionItems] = useState({});
     const [onlineUsers, setOnlineUsers] = useState([]);
     const [allMembers, setAllMembers] = useState({});
     const [createdAt, setCreatedAt] = useState(null);
@@ -53,6 +54,7 @@ export const useBoard = (boardId) => {
     const currentUser = localStorage.getItem('crisp_user_name');
     const currentUserId = localStorage.getItem('crisp_user_id');
     const userEmail = localStorage.getItem('crisp_user_email');
+    const userAvatar = localStorage.getItem('crisp_user_avatar') || '👾';
     const [isAdmin, setIsAdmin] = useState(false);
 
     // Permission & Self-Healing Logic
@@ -112,6 +114,7 @@ export const useBoard = (boardId) => {
         set(userRef, {
             id: currentUserId,
             name: currentUser,
+            avatar: userAvatar,
             joinedAt: Date.now()
         }).then(() => {
             // Remove ONLY this connection on disconnect
@@ -125,13 +128,15 @@ export const useBoard = (boardId) => {
                 return {
                     ...currentData,
                     name: currentUser,
+                    avatar: userAvatar,
                     lastSeen: Date.now()
                 };
             } else {
                 return {
                     id: currentUserId,
                     name: currentUser,
-                    joinedAt: Date.now(), // First time join
+                    avatar: userAvatar,
+                    joinedAt: Date.now(),
                     lastSeen: Date.now()
                 };
             }
@@ -148,6 +153,28 @@ export const useBoard = (boardId) => {
             remove(userRef);
         };
     }, [boardId, currentUserId, currentUser, createdAt]);
+
+    // Listen for avatar changes and sync to Firebase
+    useEffect(() => {
+        const handler = (e) => {
+            const newAvatar = e.detail?.avatar || localStorage.getItem('crisp_user_avatar') || '👾';
+            if (!boardId || !database || !currentUserId) return;
+            const onlineUserRef = ref(database, `boards/${boardId}/onlineUsers/${currentUserId}`);
+            get(onlineUserRef).then((snap) => {
+                const connections = snap.val();
+                if (!connections) return;
+                const updates = {};
+                Object.keys(connections).forEach(connId => {
+                    updates[`boards/${boardId}/onlineUsers/${currentUserId}/${connId}/avatar`] = newAvatar;
+                });
+                // Also update allMembers entry
+                updates[`boards/${boardId}/allMembers/${currentUserId}/avatar`] = newAvatar;
+                update(ref(database), updates).catch(err => console.error('Avatar sync error:', err));
+            });
+        };
+        window.addEventListener('crisp_avatar_changed', handler);
+        return () => window.removeEventListener('crisp_avatar_changed', handler);
+    }, [boardId, database, currentUserId]);
 
     // Load data (Firebase or LocalStorage)
     useEffect(() => {
@@ -166,6 +193,7 @@ export const useBoard = (boardId) => {
                     setTimer(data.timer || { isRunning: false, timeLeft: 180 });
                     setMusic(data.music || { isPlaying: false });
                     setPolls(data.polls || {});
+                    setActionItems(data.actionItems || {});
                     setCreatedAt(data.createdAt || null);
 
                     // Handle multi-connection online users
@@ -212,6 +240,7 @@ export const useBoard = (boardId) => {
                             setTimer(parsed.timer || { isRunning: false, timeLeft: 180 });
                             setMusic(parsed.music || { isPlaying: false });
                             setPolls(parsed.polls || {});
+                            setActionItems(parsed.actionItems || {});
                             setCreatedAt(parsed.createdAt || null);
                             return; // Keep local data until Firebase has something
                         } catch (e) {
@@ -241,6 +270,7 @@ export const useBoard = (boardId) => {
                 setTimer(parsed.timer || { isRunning: false, timeLeft: 180 });
                 setMusic(parsed.music || { isPlaying: false });
                 setPolls(parsed.polls || {});
+                setActionItems(parsed.actionItems || {});
                 setCreatedAt(parsed.createdAt || null);
                 setHasLoaded(true);
             }
@@ -257,6 +287,7 @@ export const useBoard = (boardId) => {
                         setTimer(newVal.timer || { isRunning: false, timeLeft: 180 });
                         setMusic(newVal.music || { isPlaying: false });
                         setPolls(newVal.polls || {});
+                        setActionItems(newVal.actionItems || {});
                         setCreatedAt(newVal.createdAt || null);
                     }
                 }
@@ -366,6 +397,7 @@ export const useBoard = (boardId) => {
             content,
             author,
             authorId,
+            authorAvatar: userAvatar,
             votes: 0,
             order: maxOrder + 1,
             createdAt: Date.now(),
@@ -543,6 +575,7 @@ export const useBoard = (boardId) => {
             content,
             author: userName,
             authorId: userId,
+            authorAvatar: userAvatar,
             createdAt: Date.now()
         };
 
@@ -687,10 +720,41 @@ export const useBoard = (boardId) => {
         });
     }, [saveData]);
 
+    // Action Items CRUD (Admin only)
+    const addActionItem = useCallback((text = '') => {
+        const id = crypto.randomUUID();
+        const newItem = { id, text, createdAt: Date.now() };
+        setActionItems(prev => {
+            const updated = { ...prev, [id]: newItem };
+            saveData({ actionItems: updated });
+            return updated;
+        });
+        return id;
+    }, [saveData]);
+
+    const updateActionItem = useCallback((id, updates) => {
+        setActionItems(prev => {
+            if (!prev[id]) return prev;
+            const updated = { ...prev, [id]: { ...prev[id], ...updates } };
+            saveData({ actionItems: updated });
+            return updated;
+        });
+    }, [saveData]);
+
+    const deleteActionItem = useCallback((id) => {
+        setActionItems(prev => {
+            const updated = { ...prev };
+            delete updated[id];
+            saveData({ actionItems: updated });
+            return updated;
+        });
+    }, [saveData]);
+
     // Clear all notes (Admin only)
     const clearAllNotes = useCallback(() => {
         // Optimistic local update
         setNotes({});
+        setActionItems({});
 
         if (database && boardId) {
             console.log("Removing notes from Firebase...");
@@ -706,10 +770,13 @@ export const useBoard = (boardId) => {
                     // Reload to restore state if write failed
                     window.location.reload();
                 });
+
+            const actionItemsRef = ref(database, `boards/${boardId}/actionItems`);
+            remove(actionItemsRef).catch(err => console.error("Failed to clear action items:", err));
         } else {
             // Fallback for LocalStorage
             console.log("Clearing notes from LocalStorage...");
-            saveData({ notes: {} });
+            saveData({ notes: {}, actionItems: {} });
             toast.success("Board cleared (Local)");
         }
     }, [boardId, saveData, toast]);
@@ -720,6 +787,7 @@ export const useBoard = (boardId) => {
         const now = Date.now();
         const updates = {
             notes: null,
+            actionItems: null,
             allMembers: null,
             createdAt: now,
             updatedAt: now
@@ -731,12 +799,14 @@ export const useBoard = (boardId) => {
             const currentData = JSON.parse(localStorage.getItem(`crisp_board_${boardId}`) || '{}');
             const newData = { ...currentData, ...updates };
             delete newData.notes;
+            delete newData.actionItems;
             delete newData.allMembers;
             localStorage.setItem(`crisp_board_${boardId}`, JSON.stringify(newData));
         }
 
         // Local state updates
         setNotes({});
+        setActionItems({});
         setCreatedAt(now);
         setAllMembers({});
 
@@ -750,6 +820,7 @@ export const useBoard = (boardId) => {
         columns,
         sortedColumns,
         notes,
+        currentUserAvatar: userAvatar,
         boardName,
         isFirebaseReady,
         isAdmin,
@@ -757,6 +828,10 @@ export const useBoard = (boardId) => {
         music,
         polls,
         activePoll,
+        actionItems,
+        addActionItem,
+        updateActionItem,
+        deleteActionItem,
         onlineUsers,
         addColumn,
         updateColumn,

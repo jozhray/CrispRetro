@@ -1,8 +1,17 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ThumbsUp, Trash2, User, GripVertical, MessageSquare, Send, Edit2, X, Check, Palette } from 'lucide-react';
+import { ThumbsUp, Trash2, GripVertical, MessageSquare, Send, Edit2, X, Check, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, isAdmin, dragControls }) => {
+// Inline mini-avatar renderer
+const MiniAvatar = ({ avatar, size = 14 }) => {
+    const isBase64 = avatar?.startsWith('data:image');
+    if (isBase64) {
+        return <img src={avatar} alt="avatar" className="rounded-full object-cover flex-shrink-0" style={{ width: size, height: size }} />;
+    }
+    return <span style={{ fontSize: size - 2, lineHeight: 1 }} className="flex-shrink-0 select-none">{avatar || '👾'}</span>;
+};
+
+const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, currentUserAvatar, allMembers, isAdmin, dragControls }) => {
     const cardRef = useRef(null);
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
@@ -235,7 +244,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
 
             <div className={`flex items-center justify-between text-xs mt-3 pt-3 border-t ${isDarkBackground ? 'border-white/10 text-white/70' : 'border-gray-50 text-gray-500'}`}>
                 <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full flex-1 min-w-0 ${isDarkBackground ? 'bg-black/20' : 'bg-gray-50'}`}>
-                    <User size={12} />
+                    <MiniAvatar avatar={allMembers?.[note.authorId]?.avatar || (note.authorId === currentUserId ? currentUserAvatar : note.authorAvatar)} size={16} />
                     <span className="font-medium truncate" title={note.author}>{note.author}</span>
                 </div>
 
@@ -333,7 +342,10 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                             {note.comments && Object.values(note.comments).sort((a, b) => a.createdAt - b.createdAt).map(comment => (
                                 <div key={comment.id} className="bg-gray-50/50 p-2.5 rounded-lg text-xs group/comment relative border border-gray-100">
                                     <div className="flex justify-between items-start mb-1 h-5 gap-2">
-                                        <span className="font-semibold text-gray-700 truncate min-w-0 flex-1" title={comment.author}>{comment.author}</span>
+                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                            <MiniAvatar avatar={allMembers?.[comment.authorId]?.avatar || (comment.authorId === currentUserId ? currentUserAvatar : comment.authorAvatar)} size={14} />
+                                            <span className="font-semibold text-gray-700 truncate" title={comment.author}>{comment.author}</span>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] text-gray-400">
                                                 {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
