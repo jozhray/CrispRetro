@@ -814,12 +814,13 @@ const Home = () => {
                                                     id="join-board-btn"
                                                     type="submit"
                                                     disabled={!!boardName}
-                                                    className={`text-white p-4 rounded-lg transition-all transform shadow-lg ${boardName
+                                                    className={`flex items-center gap-2 text-white px-5 py-3 rounded-lg transition-all transform shadow-lg ${boardName
                                                         ? 'bg-gray-600 cursor-not-allowed opacity-50'
                                                         : 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:scale-105 active:scale-95 shadow-pink-500/25'
                                                         }`}
                                                 >
                                                     <Users size={20} />
+                                                    <span className="font-semibold">Join</span>
                                                 </button>
                                             </form>
                                         </>

@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Music, Volume2 } from 'lucide-react';
 
 const TRACKS = [
-    { name: 'Lofi Study', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112721.mp3' },
-    { name: 'Cool Jazz', url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=soft-jazz-1009.mp3' },
+    { name: 'Lofi Study', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' },
+    { name: 'Cool Jazz', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3' },
     { name: 'Morning Focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
     { name: 'Creative Flow', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
     { name: 'Brainstorm', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
