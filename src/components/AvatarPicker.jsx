@@ -1,12 +1,34 @@
-import React, { useRef } from 'react';
-import { Upload, Image as ImageIcon } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Upload } from 'lucide-react';
 import { useToast } from './Toast';
 
-export const EMOJI_AVATARS = ['👾', '🤖', '👽', '👻', '🐶', '🦊', '🐱', '🐯', '🐼', '🐨', '🐸', '🦄', '🦉', '😎', '🤠'];
+const AVATAR_CATEGORIES = {
+    'Faces': [
+        '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉',
+        '😊', '😇', '🥰', '😍', '🤩', '😎', '🤓', '🧐', '🤠', '🥳',
+        '😏', '😌', '🤗', '🤔', '🫡', '🤐', '🤨', '😶', '🫥', '😬',
+    ],
+    'People': [
+        '👶', '🧒', '👦', '👧', '🧑', '👩', '👨', '🧔', '👩‍🦰', '👨‍🦱',
+        '👩‍🦳', '🧓', '👴', '👵', '🦸', '🦹', '🧙', '🧚', '🧛', '🧜',
+        '🧝', '🧞', '🧟', '🥷', '🫅', '🤴', '👸', '🎅', '🤶', '💂',
+    ],
+    'Animals': [
+        '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐻‍❄️', '🐨',
+        '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦅',
+        '🦉', '🦄', '🐴', '🐝', '🐛', '🦋', '🐢', '🐙', '🦈', '🐬',
+    ],
+    'Fantasy': [
+        '👾', '🤖', '👽', '👻', '💀', '☠️', '👿', '😈', '🎃', '🫠',
+    ],
+};
+
+export const EMOJI_AVATARS = Object.values(AVATAR_CATEGORIES).flat();
 
 const AvatarPicker = ({ avatar, setAvatar, className = '' }) => {
     const fileInputRef = useRef(null);
     const toast = useToast();
+    const [activeCategory, setActiveCategory] = useState('Faces');
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -54,23 +76,26 @@ const AvatarPicker = ({ avatar, setAvatar, className = '' }) => {
     };
 
     const isBase64 = avatar?.startsWith('data:image');
+    const categories = Object.keys(AVATAR_CATEGORIES);
 
     return (
         <div className={`space-y-3 ${className}`}>
             <label className="text-xs text-gray-500 font-medium px-1 uppercase tracking-wider">Choose Avatar</label>
-            <div className="flex flex-wrap gap-2">
-                {/* Upload Button */}
+
+            {/* Upload Photo Button */}
+            <div className="flex items-center gap-3 pb-2 border-b border-gray-700/50">
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${isBase64 ? 'border-cyan-400 bg-cyan-500/20' : 'border-gray-600 bg-slate-800 hover:border-gray-500'}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all text-sm ${isBase64 ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300' : 'border-gray-600 bg-slate-800 hover:border-gray-500 text-gray-400 hover:text-gray-300'}`}
                     title="Upload Photo"
                 >
                     {isBase64 ? (
-                        <img src={avatar} alt="Avatar" className="w-full h-full object-cover rounded-full" />
+                        <img src={avatar} alt="Avatar" className="w-7 h-7 object-cover rounded-full" />
                     ) : (
-                        <Upload size={16} className="text-gray-400" />
+                        <Upload size={16} />
                     )}
+                    <span>{isBase64 ? 'Change Photo' : 'Upload Photo'}</span>
                 </button>
 
                 <input
@@ -80,14 +105,36 @@ const AvatarPicker = ({ avatar, setAvatar, className = '' }) => {
                     accept="image/*"
                     onChange={handleFileChange}
                 />
+            </div>
 
-                {/* Emojis */}
-                {EMOJI_AVATARS.map(emoji => (
+            {/* Category Tabs */}
+            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-700">
+                {categories.map(cat => (
+                    <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setActiveCategory(cat)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeCategory === cat
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                            : 'bg-slate-800/60 text-gray-400 border border-transparent hover:text-gray-300 hover:bg-slate-700/60'
+                        }`}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
+
+            {/* Emoji Grid */}
+            <div className="grid grid-cols-8 gap-1.5 max-h-[180px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-700">
+                {AVATAR_CATEGORIES[activeCategory].map(emoji => (
                     <button
                         key={emoji}
                         type="button"
                         onClick={() => setAvatar(emoji)}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${avatar === emoji ? 'bg-cyan-500/20 border-2 border-cyan-400 scale-110' : 'bg-slate-800 border-2 border-transparent hover:border-gray-600 hover:scale-105'}`}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-xl transition-all ${avatar === emoji
+                            ? 'bg-cyan-500/20 border-2 border-cyan-400 scale-110 shadow-lg shadow-cyan-500/20'
+                            : 'bg-slate-800/60 border border-transparent hover:border-gray-600 hover:scale-105 hover:bg-slate-700/60'
+                        }`}
                     >
                         {emoji}
                     </button>
