@@ -113,7 +113,7 @@ const Header = () => {
                         className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
                         onClick={() => setShowAvatarModal(false)}
                     />
-                    <div className="relative bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200">
+                    <div className="relative bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl max-w-md w-full animate-in zoom-in-95 duration-200">
                         <div className="flex items-center gap-3 mb-5">
                             <AvatarDisplay avatar={editAvatar} size="lg" />
                             <div>
@@ -122,7 +122,7 @@ const Header = () => {
                             </div>
                         </div>
 
-                        <div className="max-h-60 overflow-y-auto pr-1">
+                        <div className="max-h-80 overflow-y-auto pr-1">
                             <AvatarPicker avatar={editAvatar} setAvatar={setEditAvatar} />
                         </div>
 
