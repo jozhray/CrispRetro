@@ -23,6 +23,8 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
     const [animatedEmoji, setAnimatedEmoji] = useState('❤️');
+    const [selectedReaction, setSelectedReaction] = useState(null);
+    const [showReactionPicker, setShowReactionPicker] = useState(false);
     const [lastVoteCount, setLastVoteCount] = useState(note.votes || 0);
     const [showComments, setShowComments] = useState(false);
     const [newComment, setNewComment] = useState("");
@@ -273,31 +275,57 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                         <span>{note.comments ? Object.keys(note.comments).length : 0}</span>
                     </button>
 
-                    {/* Reaction Buttons */}
-                    <div className={`flex items-center gap-0.5 px-1 py-0.5 rounded-full ${isDarkBackground ? 'bg-black/20' : 'bg-gray-50'}`}>
-                        {REACTIONS.map(({ emoji, label }) => (
-                            <motion.button
-                                key={emoji}
-                                onClick={() => hasContent && handleReact(emoji)}
-                                whileTap={hasContent ? { scale: 0.85 } : {}}
-                                disabled={!hasContent}
-                                title={!hasContent ? 'Add content first' : label}
-                                className={`text-sm px-1 py-0.5 rounded-full transition-all leading-none ${
-                                    !hasContent
-                                        ? 'opacity-30 cursor-not-allowed'
-                                        : hasVoted
-                                            ? 'opacity-60 hover:opacity-100 hover:scale-125'
-                                            : 'hover:scale-125 hover:bg-white/30'
-                                }`}
-                            >
-                                {emoji}
-                            </motion.button>
-                        ))}
-                        {(note.votes || 0) > 0 && (
-                            <span className={`text-[10px] font-bold pl-0.5 pr-1 ${
-                                isDarkBackground ? 'text-white/60' : 'text-gray-400'
-                            }`}>{note.votes}</span>
-                        )}
+                    {/* Single Reaction Button with hover picker */}
+                    <div
+                        className="relative"
+                        onMouseEnter={() => hasContent && setShowReactionPicker(true)}
+                        onMouseLeave={() => setShowReactionPicker(false)}
+                    >
+                        {/* Reaction picker popup - shows on hover */}
+                        <AnimatePresence>
+                            {showReactionPicker && hasContent && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 5, scale: 0.9 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 5, scale: 0.9 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="absolute bottom-full mb-1 right-0 flex items-center gap-1 bg-white border border-gray-100 shadow-xl rounded-full px-2 py-1 z-30"
+                                >
+                                    {REACTIONS.map(({ emoji, label }) => (
+                                        <motion.button
+                                            key={emoji}
+                                            whileHover={{ scale: 1.4 }}
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={() => { handleReact(emoji); setSelectedReaction(emoji); setShowReactionPicker(false); }}
+                                            title={label}
+                                            className="text-base leading-none transition-all"
+                                        >
+                                            {emoji}
+                                        </motion.button>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* The single react button */}
+                        <button
+                            disabled={!hasContent}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
+                                !hasContent
+                                    ? 'opacity-30 cursor-not-allowed'
+                                    : hasVoted
+                                        ? (isDarkBackground ? 'bg-pink-900/40 text-pink-200' : 'bg-pink-50 text-pink-500')
+                                        : (isDarkBackground ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-100 text-gray-400')
+                            }`}
+                            title={!hasContent ? 'Add content to react' : 'React'}
+                        >
+                            <span className="text-sm leading-none">
+                                {hasVoted && selectedReaction ? selectedReaction : '😊'}
+                            </span>
+                            {(note.votes || 0) > 0 && (
+                                <span className="text-[10px] font-bold">{note.votes}</span>
+                            )}
+                        </button>
                     </div>
 
                     {canDelete && (

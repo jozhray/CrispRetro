@@ -1673,7 +1673,7 @@ const BoardPage = () => {
 
                                 {/* Panel Body */}
                                 {/* Action Items List */}
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-200">
+                                <div className="flex-1 overflow-y-auto overflow-x-visible p-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-200" onClick={() => setShowColorPickerForId(null)}>
                                     {Object.values(actionItems || {}).length === 0 ? (
                                         <div className="h-full flex flex-col items-center justify-center text-center p-4">
                                             <span className="text-3xl mb-1">📝</span>
@@ -1715,7 +1715,7 @@ const BoardPage = () => {
                                                             </button>
                                                             {/* Color picker popup */}
                                                             {showColorPickerForId === item.id && (
-                                                                <div className="absolute bottom-full right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 flex flex-wrap gap-1.5 z-[100]" style={{ width: '130px' }}>
+                                                                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 flex flex-wrap gap-1.5 z-[200]" style={{ width: '130px' }}>
                                                                     {[
                                                                         { label: 'White', bg: 'bg-gray-50', border: 'border-gray-200' },
                                                                         { label: 'Red', bg: 'bg-red-50', border: 'border-red-200' },
