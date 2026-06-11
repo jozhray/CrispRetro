@@ -100,10 +100,28 @@ const BoardPage = () => {
 
     // Resume Audio Handler
     const handleResumeAudio = () => {
+        setAudioBlocked(false);
         if (audioManagerRef.current) {
             audioManagerRef.current.resumeAudio();
         }
     };
+
+    // Global interaction listener to bypass strict autoplay blocks
+    useEffect(() => {
+        const handleGlobalInteraction = () => {
+            if (audioBlocked) {
+                handleResumeAudio();
+            }
+        };
+        // Add listeners for generic interactions
+        document.addEventListener('click', handleGlobalInteraction, { once: true });
+        document.addEventListener('keydown', handleGlobalInteraction, { once: true });
+        
+        return () => {
+            document.removeEventListener('click', handleGlobalInteraction);
+            document.removeEventListener('keydown', handleGlobalInteraction);
+        };
+    }, [audioBlocked]);
 
     const {
         columns,

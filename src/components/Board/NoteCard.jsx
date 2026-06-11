@@ -23,7 +23,6 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
     const [animatedEmoji, setAnimatedEmoji] = useState('❤️');
-    const [selectedReaction, setSelectedReaction] = useState(null);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
     const [lastVoteCount, setLastVoteCount] = useState(note.votes || 0);
     const [showComments, setShowComments] = useState(false);
@@ -61,8 +60,27 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     const isDarkBackground = contrastTextColor === 'text-white';
     const canDelete = isAdmin || (note.authorId && note.authorId === currentUserId);
 
-    // Check if current user has voted
-    const hasVoted = note.votedBy?.includes(currentUserId);
+    // Determine if current user has reacted and with which emoji
+    let userReaction = null;
+    let hasVoted = false;
+    
+    // Check old voting system
+    if (note.votedBy?.includes(currentUserId)) {
+        hasVoted = true;
+        userReaction = '👍'; // Default for old votes
+    }
+    
+    // Check new reactions system
+    if (note.reactions) {
+        Object.entries(note.reactions).forEach(([emoji, users]) => {
+            // Note: users might be an object in Firebase, handle both array and object
+            const userArray = Array.isArray(users) ? users : Object.values(users || {});
+            if (userArray.includes(currentUserId)) {
+                hasVoted = true;
+                userReaction = emoji;
+            }
+        });
+    }
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -100,13 +118,12 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
 
     const handleReact = (emoji) => {
         if (!hasContent) return;
-        const hasReacted = note.votedBy?.includes(currentUserId);
-        if (!hasReacted) {
+        if (!hasVoted) {
             setAnimatedEmoji(emoji);
             setShowVoteAnimation(true);
             setTimeout(() => setShowVoteAnimation(false), 1000);
         }
-        onVote(note.id);
+        reactNote(note.id, emoji);
     };
 
     const canMove = isAdmin || (note.authorId && note.authorId === currentUserId);
@@ -296,7 +313,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                                             key={emoji}
                                             whileHover={{ scale: 1.4 }}
                                             whileTap={{ scale: 0.9 }}
-                                            onClick={() => { handleReact(emoji); setSelectedReaction(emoji); setShowReactionPicker(false); }}
+                                            onClick={() => { handleReact(emoji); setShowReactionPicker(false); }}
                                             title={label}
                                             className="text-base leading-none transition-all"
                                         >
@@ -309,6 +326,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
 
                         {/* The single react button */}
                         <button
+                            onClick={() => { if (hasContent) handleReact('👍'); }}
                             disabled={!hasContent}
                             className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
                                 !hasContent
@@ -320,7 +338,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                             title={!hasContent ? 'Add content to react' : 'React'}
                         >
                             <span className="text-sm leading-none">
-                                {hasVoted && selectedReaction ? selectedReaction : '😊'}
+                                {hasVoted && userReaction ? userReaction : '👍'}
                             </span>
                             {(note.votes || 0) > 0 && (
                                 <span className="text-[10px] font-bold">{note.votes}</span>
