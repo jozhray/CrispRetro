@@ -1,6 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ThumbsUp, Trash2, GripVertical, MessageSquare, Send, Edit2, X, Check, Palette } from 'lucide-react';
+import { Trash2, GripVertical, MessageSquare, Send, Edit2, X, Check, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const REACTIONS = [
+    { emoji: '❤️', label: 'Love' },
+    { emoji: '👍', label: 'Like' },
+    { emoji: '🔥', label: 'Fire' },
+    { emoji: '😮', label: 'Wow' },
+];
 
 // Inline mini-avatar renderer
 const MiniAvatar = ({ avatar, size = 14 }) => {
@@ -15,6 +22,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     const cardRef = useRef(null);
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
+    const [animatedEmoji, setAnimatedEmoji] = useState('❤️');
     const [lastVoteCount, setLastVoteCount] = useState(note.votes || 0);
     const [showComments, setShowComments] = useState(false);
     const [newComment, setNewComment] = useState("");
@@ -88,11 +96,11 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     // Check if note has content
     const hasContent = note.content && typeof note.content === 'string' && note.content.trim().length > 0;
 
-    const handleVote = () => {
+    const handleReact = (emoji) => {
         if (!hasContent) return;
-
-        // Only show animation if we're adding a vote, not removing
-        if (!hasVoted) {
+        const hasReacted = note.votedBy?.includes(currentUserId);
+        if (!hasReacted) {
+            setAnimatedEmoji(emoji);
             setShowVoteAnimation(true);
             setTimeout(() => setShowVoteAnimation(false), 1000);
         }
@@ -182,7 +190,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                     </button>
                 </div>
             )}
-            {/* Floating thumbs up animation */}
+            {/* Floating reaction animation */}
             <AnimatePresence>
                 {showVoteAnimation && (
                     <>
@@ -193,7 +201,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                             transition={{ duration: 0.8, ease: "easeOut" }}
                             className="absolute bottom-8 right-8 text-2xl pointer-events-none z-10"
                         >
-                            👍
+                            {animatedEmoji}
                         </motion.div>
                         <motion.div
                             initial={{ opacity: 1, y: 0, x: 0, scale: 1 }}
@@ -202,7 +210,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                             transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
                             className="absolute bottom-10 right-12 text-xl pointer-events-none z-10"
                         >
-                            👍
+                            {animatedEmoji}
                         </motion.div>
                         <motion.div
                             initial={{ opacity: 1, y: 0, scale: 1 }}
@@ -211,7 +219,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                             transition={{ duration: 1, ease: "easeOut", delay: 0.05 }}
                             className="absolute bottom-6 right-6 text-lg pointer-events-none z-10"
                         >
-                            👍
+                            {animatedEmoji}
                         </motion.div>
                     </>
                 )}
@@ -265,28 +273,32 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                         <span>{note.comments ? Object.keys(note.comments).length : 0}</span>
                     </button>
 
-                    <motion.button
-                        onClick={handleVote}
-                        whileTap={hasContent ? { scale: 0.9 } : {}}
-                        disabled={!hasContent}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${!hasContent
-                            ? (isDarkBackground ? 'bg-white/10 text-white/30 cursor-not-allowed opacity-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50')
-                            : hasVoted
-                                ? (isDarkBackground ? 'bg-blue-600/40 text-blue-200 ring-1 ring-blue-500/50' : 'bg-blue-100 text-blue-600 ring-1 ring-blue-300')
-                                : note.votes > 0
-                                    ? (isDarkBackground ? 'bg-blue-900/40 text-blue-200' : 'bg-blue-50 text-blue-600')
-                                    : (isDarkBackground ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-100 text-gray-500')
-                            }`}
-                        title={!hasContent ? "Add content to vote" : (hasVoted ? "Click to remove your vote" : "Click to vote")}
-                    >
-                        <motion.div
-                            animate={showVoteAnimation ? { rotate: [0, -20, 20, -10, 10, 0], scale: [1, 1.2, 1] } : {}}
-                            transition={{ duration: 0.5 }}
-                        >
-                            <ThumbsUp size={14} className={hasVoted ? (isDarkBackground ? 'fill-blue-200' : 'fill-blue-600') : ''} />
-                        </motion.div>
-                        <span>{note.votes || 0}</span>
-                    </motion.button>
+                    {/* Reaction Buttons */}
+                    <div className={`flex items-center gap-0.5 px-1 py-0.5 rounded-full ${isDarkBackground ? 'bg-black/20' : 'bg-gray-50'}`}>
+                        {REACTIONS.map(({ emoji, label }) => (
+                            <motion.button
+                                key={emoji}
+                                onClick={() => hasContent && handleReact(emoji)}
+                                whileTap={hasContent ? { scale: 0.85 } : {}}
+                                disabled={!hasContent}
+                                title={!hasContent ? 'Add content first' : label}
+                                className={`text-sm px-1 py-0.5 rounded-full transition-all leading-none ${
+                                    !hasContent
+                                        ? 'opacity-30 cursor-not-allowed'
+                                        : hasVoted
+                                            ? 'opacity-60 hover:opacity-100 hover:scale-125'
+                                            : 'hover:scale-125 hover:bg-white/30'
+                                }`}
+                            >
+                                {emoji}
+                            </motion.button>
+                        ))}
+                        {(note.votes || 0) > 0 && (
+                            <span className={`text-[10px] font-bold pl-0.5 pr-1 ${
+                                isDarkBackground ? 'text-white/60' : 'text-gray-400'
+                            }`}>{note.votes}</span>
+                        )}
+                    </div>
 
                     {canDelete && (
                         <div className="flex items-center gap-1">

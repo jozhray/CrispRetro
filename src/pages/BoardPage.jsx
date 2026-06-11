@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, isValidElement, cloneElement } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, LayoutGroup } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy, Sparkles, ListTodo, Minus, Maximize2, ChevronUp } from 'lucide-react';
+import { Search, Download, Share2, ArrowLeft, Wifi, WifiOff, ChevronDown, Plus, X, Trash2, Menu, MoreVertical, Users, Clock, Music, Trophy, Sparkles, ListTodo, Minus, Maximize2, ChevronUp, Palette } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -72,6 +72,7 @@ const BoardPage = () => {
     const [templateName, setTemplateName] = useState('');
     const [isSavingTemplate, setIsSavingTemplate] = useState(false);
     const [hasColumnChanges, setHasColumnChanges] = useState(false);
+    const [showColorPickerForId, setShowColorPickerForId] = useState(null);
     const boardRef = useRef(null);
     const exportMenuRef = useRef(null);
     const userListRef = useRef(null);
@@ -1685,7 +1686,7 @@ const BoardPage = () => {
                                             .map((item) => (
                                                 <div 
                                                     key={item.id} 
-                                                    className={`flex items-start gap-2 p-2 hover:bg-gray-100/80 border rounded-xl transition-all shadow-sm group ${item.color || 'bg-gray-50 border-gray-150'}`}
+                                                    className={`relative flex items-start gap-2 p-2 hover:bg-gray-100/80 border rounded-xl transition-all shadow-sm group ${item.color || 'bg-gray-50 border-gray-150'}`}
                                                 >
                                                     <div className="flex-1 flex flex-col gap-1">
                                                         <textarea
@@ -1700,25 +1701,49 @@ const BoardPage = () => {
                                                             rows={1}
                                                             style={{ minHeight: '20px' }}
                                                         />
-                                                        {/* Color options */}
-                                                        <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            {['bg-gray-50', 'bg-red-50', 'bg-green-50', 'bg-blue-50', 'bg-yellow-50', 'bg-purple-50', 'bg-pink-50'].map(color => (
-                                                                <button
-                                                                    key={color}
-                                                                    onClick={() => updateActionItem(item.id, { color })}
-                                                                    className={`w-3 h-3 rounded-full border border-gray-200 ${color} ${item.color === color ? 'ring-2 ring-offset-1 ring-gray-400' : ''}`}
-                                                                    title="Set color"
-                                                                />
-                                                            ))}
-                                                        </div>
                                                     </div>
-                                                    <button
-                                                        onClick={() => deleteActionItem(item.id)}
-                                                        className="p-1 mt-0.5 text-gray-400 hover:text-red-500 hover:bg-white/50 rounded-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                                        title="Delete Item"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
+                                                    {/* Actions: palette + delete */}
+                                                    <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {/* Palette icon button */}
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setShowColorPickerForId(showColorPickerForId === item.id ? null : item.id); }}
+                                                                className="p-1 rounded-md text-gray-400 hover:text-purple-500 hover:bg-white/60 transition-all"
+                                                                title="Change color"
+                                                            >
+                                                                <Palette size={13} />
+                                                            </button>
+                                                            {/* Color picker popup */}
+                                                            {showColorPickerForId === item.id && (
+                                                                <div className="absolute bottom-full right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-2xl p-2 flex flex-wrap gap-1.5 z-[100]" style={{ width: '130px' }}>
+                                                                    {[
+                                                                        { label: 'White', bg: 'bg-gray-50', border: 'border-gray-200' },
+                                                                        { label: 'Red', bg: 'bg-red-50', border: 'border-red-200' },
+                                                                        { label: 'Green', bg: 'bg-green-50', border: 'border-green-200' },
+                                                                        { label: 'Blue', bg: 'bg-blue-50', border: 'border-blue-200' },
+                                                                        { label: 'Yellow', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+                                                                        { label: 'Purple', bg: 'bg-purple-50', border: 'border-purple-200' },
+                                                                        { label: 'Pink', bg: 'bg-pink-50', border: 'border-pink-200' },
+                                                                        { label: 'Orange', bg: 'bg-orange-50', border: 'border-orange-200' },
+                                                                    ].map(({ label, bg, border }) => (
+                                                                        <button
+                                                                            key={label}
+                                                                            onClick={(e) => { e.stopPropagation(); updateActionItem(item.id, { color: `${bg} ${border}` }); setShowColorPickerForId(null); }}
+                                                                            className={`w-6 h-6 rounded-full ${bg} border-2 ${border} transition-transform hover:scale-110 ${item.color?.includes(bg) ? 'ring-2 ring-purple-400 ring-offset-1' : ''}`}
+                                                                            title={label}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => deleteActionItem(item.id)}
+                                                            className="p-1 text-gray-400 hover:text-red-500 hover:bg-white/50 rounded-md transition-all"
+                                                            title="Delete Item"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))
                                     )}
