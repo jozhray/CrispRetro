@@ -64,13 +64,7 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     let userReaction = null;
     let hasVoted = false;
     
-    // Check old voting system
-    if (note.votedBy?.includes(currentUserId)) {
-        hasVoted = true;
-        userReaction = '👍'; // Default for old votes
-    }
-    
-    // Check new reactions system
+    // First check new reactions system (highest priority)
     if (note.reactions) {
         Object.entries(note.reactions).forEach(([emoji, users]) => {
             // Note: users might be an object in Firebase, handle both array and object
@@ -80,6 +74,12 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                 userReaction = emoji;
             }
         });
+    }
+
+    // Fallback to old voting system if no new reaction found
+    if (!hasVoted && note.votedBy?.includes(currentUserId)) {
+        hasVoted = true;
+        userReaction = '👍'; // Default for old votes
     }
 
     useEffect(() => {
@@ -326,7 +326,11 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
 
                         {/* The single react button */}
                         <button
-                            onClick={() => { if (hasContent) handleReact('👍'); }}
+                            onClick={() => { 
+                                if (hasContent) {
+                                    handleReact(hasVoted && userReaction ? userReaction : '👍');
+                                }
+                            }}
                             disabled={!hasContent}
                             className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
                                 !hasContent
