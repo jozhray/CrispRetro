@@ -1,14 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Music, Volume2 } from 'lucide-react';
 
-// All URLs below are verified working (HTTP 200) on Pixabay CDN
 const TRACKS = [
-    { name: 'Lofi Study',        url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' },
-    { name: 'Cool Jazz',         url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3' },
+    { name: 'Lofi Study', url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' },
+    { name: 'Cool Jazz', url: 'https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3' },
+    { name: 'Morning Focus', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+    { name: 'Creative Flow', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+    { name: 'Brainstorm', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+    { name: 'Productivity Boost', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
+    { name: 'Sprint Mode', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3' },
+    { name: 'Lounge Session', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3' },
+    { name: 'Relaxing River', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3' },
+    { name: 'Uplifting Sky', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3' },
+    { name: 'Sunset Groove', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3' },
+    { name: 'Calm Night', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-17.mp3' },
+    { name: 'Gentle Rain', url: 'https://cdn.pixabay.com/audio/2025/11/15/audio_c5116879e1.mp3' },
     { name: 'Meditative Guitar', url: 'https://cdn.pixabay.com/audio/2024/11/24/audio_dcf6625030.mp3' },
-    { name: 'Chill Beat',        url: 'https://cdn.pixabay.com/audio/2022/08/04/audio_2dde668d05.mp3' },
-    { name: 'Ambient Flow',      url: 'https://cdn.pixabay.com/audio/2022/02/22/audio_d1718ab41b.mp3' },
-    { name: 'Lounge Session',    url: 'https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3' },
+    { name: 'Ambient Handpan', url: 'https://cdn.pixabay.com/audio/2025/10/09/audio_565547d988.mp3' },
+    { name: 'Soft Piano', url: 'https://cdn.pixabay.com/audio/2025/12/05/audio_3580f915fd.mp3' },
+    { name: 'Celtic Harp', url: 'https://cdn.pixabay.com/audio/2025/04/07/audio_8a3711f6a0.mp3' },
+    { name: 'Peaceful Flute', url: 'https://cdn.pixabay.com/audio/2025/01/26/audio_3f5c09b7be.mp3' }
 ];
 
 const MusicPlayer = ({

@@ -553,15 +553,51 @@ export const useBoard = (boardId) => {
                 reactions[emoji] = [...emojiReactions, userId];
             }
 
-            const updatedNote = { ...note, reactions };
+            // Synchronize legacy votedBy and votes based on reactions
+            const newVotedBy = new Set(note.votedBy || []);
+            let hasAnyReaction = false;
+            
+            Object.keys(reactions).forEach(key => {
+                if (reactions[key].includes(userId)) {
+                    hasAnyReaction = true;
+                }
+            });
+
+            if (hasAnyReaction) {
+                newVotedBy.add(userId);
+            } else {
+                newVotedBy.delete(userId);
+            }
+
+            const updatedVotedBy = Array.from(newVotedBy);
+            const newVotes = updatedVotedBy.length;
+
+            const updatedNote = { 
+                ...note, 
+                reactions,
+                votedBy: updatedVotedBy,
+                votes: newVotes
+            };
             const updatedNotes = { ...prev, [noteId]: updatedNote };
 
-            // Save to Firebase/localStorage
-            saveData({ notes: updatedNotes });
+            // Atomic Firebase Update
+            if (database && boardId) {
+                const noteRef = ref(database, `boards/${boardId}/notes/${noteId}`);
+                update(noteRef, {
+                    reactions,
+                    votes: newVotes,
+                    votedBy: updatedVotedBy
+                }).catch(err => {
+                    console.error("Failed to update reaction:", err);
+                });
+            } else {
+                // Fallback for LocalStorage
+                saveData({ notes: updatedNotes });
+            }
 
             return updatedNotes;
         });
-    }, [saveData]);
+    }, [boardId, saveData]);
 
     const addComment = useCallback((noteId, content) => {
         const userId = localStorage.getItem('crisp_user_id');
