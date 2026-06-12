@@ -18,7 +18,7 @@ const MiniAvatar = ({ avatar, size = 14 }) => {
     return <span style={{ fontSize: size - 2, lineHeight: 1 }} className="flex-shrink-0 select-none">{avatar || '👾'}</span>;
 };
 
-const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, currentUserAvatar, allMembers, isAdmin, dragControls }) => {
+const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onReact, onAddComment, onUpdateComment, onDeleteComment, currentUser, currentUserId, currentUserAvatar, allMembers, isAdmin, dragControls }) => {
     const cardRef = useRef(null);
     const textareaRef = useRef(null);
     const [showVoteAnimation, setShowVoteAnimation] = useState(false);
@@ -60,27 +60,9 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     const isDarkBackground = contrastTextColor === 'text-white';
     const canDelete = isAdmin || (note.authorId && note.authorId === currentUserId);
 
-    // Determine if current user has reacted and with which emoji
-    let userReaction = null;
-    let hasVoted = false;
-    
-    // First check new reactions system (highest priority)
-    if (note.reactions) {
-        Object.entries(note.reactions).forEach(([emoji, users]) => {
-            // Note: users might be an object in Firebase, handle both array and object
-            const userArray = Array.isArray(users) ? users : Object.values(users || {});
-            if (userArray.includes(currentUserId)) {
-                hasVoted = true;
-                userReaction = emoji;
-            }
-        });
-    }
-
-    // Fallback to old voting system if no new reaction found
-    if (!hasVoted && note.votedBy?.includes(currentUserId)) {
-        hasVoted = true;
-        userReaction = '👍'; // Default for old votes
-    }
+    // Check if user has voted
+    const safeVotedBy = Array.isArray(note.votedBy) ? note.votedBy : Object.values(note.votedBy || {});
+    const hasVoted = safeVotedBy.includes(currentUserId);
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -116,14 +98,14 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
     // Check if note has content
     const hasContent = note.content && typeof note.content === 'string' && note.content.trim().length > 0;
 
-    const handleReact = (emoji) => {
+    const handleVote = () => {
         if (!hasContent) return;
         if (!hasVoted) {
-            setAnimatedEmoji(emoji);
+            setAnimatedEmoji('👍');
             setShowVoteAnimation(true);
             setTimeout(() => setShowVoteAnimation(false), 1000);
         }
-        reactNote(note.id, emoji);
+        onVote(note.id);
     };
 
     const canMove = isAdmin || (note.authorId && note.authorId === currentUserId);
@@ -293,44 +275,9 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                     </button>
 
                     {/* Single Reaction Button with hover picker */}
-                    <div
-                        className="relative"
-                        onMouseEnter={() => hasContent && setShowReactionPicker(true)}
-                        onMouseLeave={() => setShowReactionPicker(false)}
-                    >
-                        {/* Reaction picker popup - shows on hover */}
-                        <AnimatePresence>
-                            {showReactionPicker && hasContent && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 5, scale: 0.9 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 5, scale: 0.9 }}
-                                    transition={{ duration: 0.15 }}
-                                    className="absolute bottom-full mb-1 right-0 flex items-center gap-1 bg-white border border-gray-100 shadow-xl rounded-full px-2 py-1 z-30"
-                                >
-                                    {REACTIONS.map(({ emoji, label }) => (
-                                        <motion.button
-                                            key={emoji}
-                                            whileHover={{ scale: 1.4 }}
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={() => { handleReact(emoji); setShowReactionPicker(false); }}
-                                            title={label}
-                                            className="text-base leading-none transition-all"
-                                        >
-                                            {emoji}
-                                        </motion.button>
-                                    ))}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* The single react button */}
+                    <div className="relative">
                         <button
-                            onClick={() => { 
-                                if (hasContent) {
-                                    handleReact(hasVoted && userReaction ? userReaction : '👍');
-                                }
-                            }}
+                            onClick={handleVote}
                             disabled={!hasContent}
                             className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
                                 !hasContent
@@ -339,11 +286,9 @@ const NoteCard = ({ note, onUpdate, onUpdateColor, onDelete, onVote, onAddCommen
                                         ? (isDarkBackground ? 'bg-pink-900/40 text-pink-200' : 'bg-pink-50 text-pink-500')
                                         : (isDarkBackground ? 'hover:bg-white/10 text-white/50' : 'hover:bg-gray-100 text-gray-400')
                             }`}
-                            title={!hasContent ? 'Add content to react' : 'React'}
+                            title={!hasContent ? 'Add content to vote' : 'Vote'}
                         >
-                            <span className="text-sm leading-none">
-                                {hasVoted && userReaction ? userReaction : '👍'}
-                            </span>
+                            <span className="text-sm leading-none">👍</span>
                             {(note.votes || 0) > 0 && (
                                 <span className="text-[10px] font-bold">{note.votes}</span>
                             )}

@@ -3,23 +3,17 @@ import { Upload } from 'lucide-react';
 import { useToast } from './Toast';
 
 const AVATAR_CATEGORIES = {
-    'Faces': [
-        '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😉',
-        '😊', '😇', '🥰', '😍', '🤩', '😎', '🤓', '🧐', '🤠', '🥳',
-        '😏', '😌', '🤗', '🤔', '🫡', '🤐', '🤨', '😶', '🫥', '😬',
+    'Heroes': [
+        '🦸‍♂️', '🦸‍♀️', '🦸', '🦇', '🕷️', '🕸️', '⚡', '🛡️', '🔨', '🦅',
+        '💪', '🏃‍♂️', '🏃‍♀️', '🦸‍♂️', '🦹‍♂️', '🦹‍♀️', '🦹', '🥷', '🤺', '🏹'
     ],
-    'People': [
-        '👶', '🧒', '👦', '👧', '🧑', '👩', '👨', '🧔', '👩‍🦰', '👨‍🦱',
-        '👩‍🦳', '🧓', '👴', '👵', '🦸', '🦹', '🧙', '🧚', '🧛', '🧜',
-        '🧝', '🧞', '🧟', '🥷', '🫅', '🤴', '👸', '🎅', '🤶', '💂',
+    'Powers': [
+        '🔥', '💧', '🌪️', '🧊', '✨', '☄️', '🌌', '🚀', '🛸', '🔮',
+        '🧿', '☀️', '🌙', '🌟', '💥', '💨', '🔊', '🧠', '👁️', '🦾'
     ],
-    'Animals': [
-        '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐻‍❄️', '🐨',
-        '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦅',
-        '🦉', '🦄', '🐴', '🐝', '🐛', '🦋', '🐢', '🐙', '🦈', '🐬',
-    ],
-    'Fantasy': [
-        '👾', '🤖', '👽', '👻', '💀', '☠️', '👿', '😈', '🎃', '🫠',
+    'Badges': [
+        '⭐', '🎖️', '🏆', '🏅', '🥇', '👑', '💎', '💠', '🔱', '💯',
+        '⚕️', '🔰', '☢️', '☣️', '☯️', '👁️‍🗨️', '🚀', '🛸', '🛰️', '🪐'
     ],
 };
 
@@ -28,7 +22,7 @@ export const EMOJI_AVATARS = Object.values(AVATAR_CATEGORIES).flat();
 const AvatarPicker = ({ avatar, setAvatar, className = '' }) => {
     const fileInputRef = useRef(null);
     const toast = useToast();
-    const [activeCategory, setActiveCategory] = useState('Faces');
+    const [activeCategory, setActiveCategory] = useState('Heroes');
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];

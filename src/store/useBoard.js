@@ -554,10 +554,13 @@ export const useBoard = (boardId) => {
             }
 
             // Synchronize legacy votedBy and votes based on reactions
-            const newVotedBy = new Set(note.votedBy || []);
+            const safeVotedBy = Array.isArray(note.votedBy) ? note.votedBy : Object.values(note.votedBy || {});
+            const newVotedBy = new Set(safeVotedBy);
             let hasAnyReaction = false;
             
             Object.keys(reactions).forEach(key => {
+                // Fallback to old voting system if no new reaction found
+                const safeVotedBy = Array.isArray(note.votedBy) ? note.votedBy : Object.values(note.votedBy || {});
                 if (reactions[key].includes(userId)) {
                     hasAnyReaction = true;
                 }
@@ -571,6 +574,16 @@ export const useBoard = (boardId) => {
 
             const updatedVotedBy = Array.from(newVotedBy);
             const newVotes = updatedVotedBy.length;
+            
+            console.log("REACTNOTE DEBUG:", {
+                noteId,
+                emoji,
+                oldReactions: note.reactions,
+                newReactions: reactions,
+                hasAnyReaction,
+                updatedVotedBy,
+                newVotes
+            });
 
             const updatedNote = { 
                 ...note, 
@@ -580,20 +593,7 @@ export const useBoard = (boardId) => {
             };
             const updatedNotes = { ...prev, [noteId]: updatedNote };
 
-            // Atomic Firebase Update
-            if (database && boardId) {
-                const noteRef = ref(database, `boards/${boardId}/notes/${noteId}`);
-                update(noteRef, {
-                    reactions,
-                    votes: newVotes,
-                    votedBy: updatedVotedBy
-                }).catch(err => {
-                    console.error("Failed to update reaction:", err);
-                });
-            } else {
-                // Fallback for LocalStorage
-                saveData({ notes: updatedNotes });
-            }
+            saveData({ notes: updatedNotes });
 
             return updatedNotes;
         });
